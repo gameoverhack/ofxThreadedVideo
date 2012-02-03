@@ -10,6 +10,7 @@
 #ifndef _H_OFXTHREADEDVIDEO
 #define _H_OFXTHREADEDVIDEO
 
+#include <set>
 #include <queue>
 
 #include "ofLog.h"
@@ -94,10 +95,12 @@ private:
     bool bFastPaused;
     bool bNewFrame;
     
-    queue<string> pathsToLoad;
+    //queue<string> pathsToLoad;
     string paths[2];
     ofTexture textures[2];
     ofVideoPlayer videos[2];
+    
+    int instanceID;
     
 };
 

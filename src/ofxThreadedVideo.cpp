@@ -9,10 +9,16 @@
 
 #include "ofxThreadedVideo.h"
 static ofMutex ofxThreadedVideoMutex;
-
+static map<int, queue<string> > instanceQueues;
 //--------------------------------------------------------------
 ofxThreadedVideo::ofxThreadedVideo(){
 
+    instanceID = instanceQueues.size() + 1;
+    queue<string> newQueue;
+    instanceQueues[instanceID] = newQueue;
+    
+    ofLogVerbose() << "Instantiating ofxThreadedVideo instanceID:" << instanceID;
+    
     videos[0].setUseTexture(false);
     videos[0].setPixelFormat(OF_PIXELS_RGB);
     videos[1].setUseTexture(false);
@@ -44,7 +50,11 @@ ofxThreadedVideo::~ofxThreadedVideo(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::loadMovie(string fileName){
-    
+
+    // get a reference to our queue from the static map of instance queues
+    map<int, queue<string> >::iterator it = instanceQueues.find(instanceID);
+    queue<string> & pathsToLoad = it->second;
+  
     // check if we're using a queue or only allowing one file to load at a time
     if (!bUseQueue && pathsToLoad.size() > 0) {
         ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
@@ -115,13 +125,30 @@ void ofxThreadedVideo::update(){
             bNewFrame = false;
         }
         
-        // if there's a movie in the queue
-        if(pathsToLoad.size() > 0){
-            // ...let's start trying to load it!
-            loadPath = pathsToLoad.front();
-            pathsToLoad.pop();
-        }
+        // this might not scale but using a map to store all the queues does
+        // the same job as using a static mutex BUT IT DOESN"T BLOCK the main thread!! ;-)
         
+        // iterate through all instance queues loading from lowest instance count to highest
+        for (map<int, queue<string> >::iterator it = instanceQueues.begin(); it != instanceQueues.end(); it++) {
+            // set references to queue and instance id
+            int _instanceID = it->first;
+            queue<string> & pathsToLoad = it->second;
+            // if a lower instance has a queue needing load then we wait
+            if(pathsToLoad.size() > 0 && _instanceID < instanceID) break;
+            // else if we've got paths in the queue we do a load
+            if(pathsToLoad.size() > 0 && _instanceID == instanceID){
+                // ...let's start trying to load it!
+                loadPath = pathsToLoad.front();
+                pathsToLoad.pop();
+                break;
+            }
+        }
+//        // if there's a movie in the queue
+//        if(pathsToLoad.size() > 0){
+//            // ...let's start trying to load it!
+//            loadPath = pathsToLoad.front();
+//            pathsToLoad.pop();
+//        };
         unlock();
     }
 }
@@ -141,11 +168,8 @@ void ofxThreadedVideo::threadedFunction(){
                 videoIDCounter++;
                 loadVideoID = videoIDCounter % 2;
                 
-                // lock a static mutex shared between all instances
-                // we do this in case 2+ instances are trying to load
-                // simultaneously; if we don't then Quicktime will choke
-                // as it can only really handle 1 request at time reliably
-                ofxThreadedVideoMutex.lock();
+                // using a static mutex blocks all threads (including the main app) until we've loaded
+                //ofxThreadedVideoMutex.lock();
                 
                 // load that movie!
                 if(videos[loadVideoID].loadMovie(loadPath)){
@@ -155,7 +179,6 @@ void ofxThreadedVideo::threadedFunction(){
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
                     
-                    ofxThreadedVideoMutex.unlock();
                     paths[loadVideoID] = loadPath;
                     
                 }else{
@@ -168,29 +191,27 @@ void ofxThreadedVideo::threadedFunction(){
                     ofNotifyEvent(threadedVideoEvent, videoEvent, this);
                 }
                 
+                //ofxThreadedVideoMutex.unlock();
                 loadPath = "";
             }
             
             // if we have a movie let's update it
             if(currentVideoID != -1){
                 
-                // FastPause is a hack to avoid the glitchiness of
-                // calling setPaused(true/false) when using Quicktime
-                // - basically intead of using SetMovieRate(0)
-                // as it is in ofQuicktimePlayer we just don't
-                // update the movie...it stays in one place since
-                // we're not calling MoviesTask(moviePtr,0);
-                // not sure what happens with gStreamer...
-                
+                // do non blocking seek to position
                 if(fFastPosition != -1.0f){
                     videos[currentVideoID].setPaused(true);
                     videos[currentVideoID].setPosition(fFastPosition);
                 }
                 
+                // do non blocking seek to frame
                 if(iFastFrame != -1) videos[currentVideoID].setFrame(iFastFrame);
+                
+                // do 'fast' pause by just not updateing the movie unless we're seeking to frame/position
                 if (!bFastPaused || fFastPosition != -1.0f || iFastFrame != -1) videos[currentVideoID].update();
                 if (videos[currentVideoID].isFrameNew()) bNewFrame = true;
                 
+                // unpause if doing a non blocking seek to position
                 if(fFastPosition != -1.0f) videos[currentVideoID].setPaused(false);
 
                 fFastPosition = -1.0f;
