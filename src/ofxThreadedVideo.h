@@ -95,7 +95,7 @@ private:
     bool bFastPaused;
     bool bNewFrame;
     
-    //queue<string> pathsToLoad;
+    queue<string> pathsToLoad;
     string paths[2];
     ofTexture textures[2];
     ofVideoPlayer videos[2];
