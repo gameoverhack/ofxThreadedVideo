@@ -1,0 +1,98 @@
+/*
+ *  ofxThreadedVideo.h
+ *  emptyExample
+ *
+ *  Created by gameover on 2/02/12.
+ *  Copyright 2012 trace media. All rights reserved.
+ *
+ */
+
+#ifndef _H_OFXTHREADEDVIDEO
+#define _H_OFXTHREADEDVIDEO
+
+#include <queue>
+
+#include "ofLog.h"
+#include "ofConstants.h"
+#include "ofPixels.h"
+#include "ofTexture.h"
+#include "ofThread.h"
+#include "ofEvents.h"
+#include "ofVideoPlayer.h"
+#include "ofAppRunner.h"
+
+enum ofxThreadedVideoEventType{
+    VIDEO_EVENT_LOAD_OK = 0,
+    VIDEO_EVENT_LOAD_FAIL,
+    VIDEO_EVENT_LOAD_BLOCKED
+};
+
+class ofxThreadedVideoEvent{
+    
+public:
+    
+    ofxThreadedVideoEvent(string _path, ofxThreadedVideoEventType _eventType, ofVideoPlayer * _video)
+    : path(_path), eventType(_eventType), video(_video){};
+    
+    string path;
+    ofxThreadedVideoEventType eventType;
+    ofVideoPlayer * video;
+};
+
+class ofxThreadedVideo : public ofThread {
+
+public:
+    
+    ofxThreadedVideo();
+    ~ofxThreadedVideo();
+    
+    void update();
+    
+    void draw();
+    void draw(float x, float y);
+    void draw(float x, float y, float w, float h);
+    
+    bool loadMovie(string fileName);
+    
+    void setUseAutoPlay(bool b);
+    bool getUseAutoPlay();
+    
+    void setUseQueue(bool b);
+    bool getUseQueue();
+    
+    void setFastPaused(bool b);
+    bool isFastPaused();
+    
+    ofVideoPlayer & getVideo();
+    ofTexture & getTextureReference();
+    
+    string getPath();
+    
+    ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
+    inline string getEventTypeAsString(ofxThreadedVideoEventType eventType);
+    
+protected:
+    
+    void threadedFunction();
+    
+private:
+    
+    int loadVideoID;
+    int currentVideoID;
+    int videoIDCounter;
+    
+    string loadPath;
+    
+    bool bUseAutoPlay;
+    bool bUseQueue;
+    bool bFastPaused;
+    bool bNewFrame;
+    
+    queue<string> pathsToLoad;
+    string paths[2];
+    ofTexture textures[2];
+    ofVideoPlayer videos[2];
+    
+};
+
+#endif
