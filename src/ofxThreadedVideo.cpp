@@ -24,6 +24,9 @@ ofxThreadedVideo::ofxThreadedVideo(){
     videoIDCounter = -1;
     loadPath = "";
     
+    fFastPosition = -1.0f;
+    iFastFrame = -1;
+
     bUseAutoPlay = true;
     bUseQueue = false;
     bFastPaused = false;
@@ -63,23 +66,6 @@ void ofxThreadedVideo::update(){
     
     if(lock()){
         
-        // check for a new frame
-        if(currentVideoID != -1 && bNewFrame){
-            
-            float w = videos[currentVideoID].getWidth();
-            float h = videos[currentVideoID].getHeight();
-            
-            // get the pixels
-            ofPixels & pixels = videos[currentVideoID].getPixelsRef();
-            
-            // make sure we don't have NULL pixels (happens sometimes!)
-            if(pixels.getPixels() != NULL){
-                textures[currentVideoID].loadData(pixels.getPixels(), w, h, GL_RGB);
-            }
-            
-            bNewFrame = false;
-        }
-        
         // check if we're loading a video
         if(loadVideoID != -1){
             
@@ -99,6 +85,10 @@ void ofxThreadedVideo::update(){
                 videos[currentVideoID].close();
             }
             
+            // push one update
+            videos[loadVideoID].update();
+            bNewFrame = true;
+            
             // switch the current movie ID to the one we just loaded
             currentVideoID = loadVideoID;
             loadVideoID = -1;
@@ -106,6 +96,23 @@ void ofxThreadedVideo::update(){
             // send event notification
             ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[currentVideoID], VIDEO_EVENT_LOAD_OK, &videos[currentVideoID]);
             ofNotifyEvent(threadedVideoEvent, videoEvent, this);
+        }
+        
+        // check for a new frame
+        if(currentVideoID != -1 && bNewFrame){
+            
+            float w = videos[currentVideoID].getWidth();
+            float h = videos[currentVideoID].getHeight();
+            
+            // get the pixels
+            ofPixels & pixels = videos[currentVideoID].getPixelsRef();
+            
+            // make sure we don't have NULL pixels (happens sometimes!)
+            if(pixels.getPixels() != NULL){
+                textures[currentVideoID].loadData(pixels.getPixels(), w, h, GL_RGB);
+            }
+            
+            bNewFrame = false;
         }
         
         // if there's a movie in the queue
@@ -175,8 +182,19 @@ void ofxThreadedVideo::threadedFunction(){
                 // we're not calling MoviesTask(moviePtr,0);
                 // not sure what happens with gStreamer...
                 
-                if (!bFastPaused) videos[currentVideoID].update();
+                if(fFastPosition != -1.0f){
+                    videos[currentVideoID].setPaused(true);
+                    videos[currentVideoID].setPosition(fFastPosition);
+                }
+                
+                if(iFastFrame != -1) videos[currentVideoID].setFrame(iFastFrame);
+                if (!bFastPaused || fFastPosition != -1.0f || iFastFrame != -1) videos[currentVideoID].update();
                 if (videos[currentVideoID].isFrameNew()) bNewFrame = true;
+                
+                if(fFastPosition != -1.0f) videos[currentVideoID].setPaused(false);
+
+                fFastPosition = -1.0f;
+                iFastFrame = -1;
             }
             
             unlock();
@@ -233,6 +251,20 @@ void ofxThreadedVideo::setFastPaused(bool b){
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFastPaused(){
     return bFastPaused;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setFastPosition(float pct){
+    CLAMP(pct, 0.0f, 1.0f);
+    fFastPosition = pct;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setFastFrame(int frame){
+    if(currentVideoID != -1){
+        CLAMP(frame, 0, videos[currentVideoID].getTotalNumFrames());
+        iFastFrame = frame;
+    }
 }
 
 //--------------------------------------------------------------

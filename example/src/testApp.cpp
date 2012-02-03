@@ -61,19 +61,22 @@ void testApp::mouseMoved(int x, int y ){
 //--------------------------------------------------------------
 void testApp::mouseDragged(int x, int y, int button){
     ofVideoPlayer & video = video1.getVideo();
-    video.setPosition(ofGetWidth()/(float)x);
+    video1.setFastFrame(video.getTotalNumFrames() * (float)x/ofGetWidth());
+    //video2.setFastPosition((float)x/ofGetWidth());
 }
 
 //--------------------------------------------------------------
 void testApp::mousePressed(int x, int y, int button){
-    bool bPaused = video1.isFastPaused();
-    video1.setFastPaused(true);
+    //bool bPaused = video1.isFastPaused();
+    //video1.setFastPaused(true);
+    //video2.setFastPaused(true);
 }
 
 //--------------------------------------------------------------
 void testApp::mouseReleased(int x, int y, int button){
-    bool bPaused = video1.isFastPaused();
-    video1.setFastPaused(false);
+    //bool bPaused = video1.isFastPaused();
+    //video1.setFastPaused(false);
+    //video2.setFastPaused(false);
 }
 
 //--------------------------------------------------------------

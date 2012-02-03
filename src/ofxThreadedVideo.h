@@ -63,6 +63,9 @@ public:
     void setFastPaused(bool b);
     bool isFastPaused();
     
+    void setFastPosition(float pct);
+    void setFastFrame(int frame);
+    
     ofVideoPlayer & getVideo();
     ofTexture & getTextureReference();
     
@@ -82,6 +85,9 @@ private:
     int videoIDCounter;
     
     string loadPath;
+    
+    float fFastPosition;
+    int iFastFrame;
     
     bool bUseAutoPlay;
     bool bUseQueue;
