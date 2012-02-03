@@ -10,6 +10,9 @@ void testApp::setup(){
     
     video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
     video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
+    
+    ofAddListener(video1.threadedVideoEvent, this, &testApp::threadedVideoEvent);
+    ofAddListener(video2.threadedVideoEvent, this, &testApp::threadedVideoEvent);
 }
 
 //--------------------------------------------------------------
@@ -28,6 +31,11 @@ void testApp::draw(){
     int duration1 = video1.getVideo().getDuration();
     int duration2 = video2.getVideo().getDuration();
     ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate()) + " duration vid1: " + ofToString(duration1) + " duration vid2: " + ofToString(duration2), 20, ofGetHeight() - 20);
+}
+
+//--------------------------------------------------------------
+void testApp::threadedVideoEvent(ofxThreadedVideoEvent & event){
+    ofLogVerbose() << "VideoEvent:" << event.eventTypeAsString << "for" << event.path;
 }
 
 //--------------------------------------------------------------

@@ -14,12 +14,14 @@ static ofMutex ofxThreadedVideoMutex;
 //--------------------------------------------------------------
 ofxThreadedVideo::ofxThreadedVideo(){
     
+    // setup video instances
     videos[0].setUseTexture(false);
     videos[0].setPixelFormat(OF_PIXELS_RGB);
     videos[1].setUseTexture(false);
     videos[1].setPixelFormat(OF_PIXELS_RGB);
     paths[0] = paths[1] = "";
     
+    // set vars to default values
     loadVideoID = -1;
     currentVideoID = -1;
     videoIDCounter = -1;
@@ -33,14 +35,21 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bFastPaused = false;
     bNewFrame = false;
     
+    // let's go!
     startThread(false, false);
 }
 
 //--------------------------------------------------------------
 ofxThreadedVideo::~ofxThreadedVideo(){
+    
+    // stop threading
     waitForThread(true);
+    
+    // close anything left open
     videos[0].close();
     videos[1].close();
+    paths[0] = paths[1] = "";
+
 }
 
 //--------------------------------------------------------------
@@ -51,7 +60,7 @@ bool ofxThreadedVideo::loadMovie(string fileName){
         ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
         
         // send event notification
-        ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_BLOCKED, NULL);
+        ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_BLOCKED, this);
         ofNotifyEvent(threadedVideoEvent, videoEvent, this);
         
         return false;
@@ -95,7 +104,7 @@ void ofxThreadedVideo::update(){
             loadVideoID = -1;
             
             // send event notification
-            ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[currentVideoID], VIDEO_EVENT_LOAD_OK, &videos[currentVideoID]);
+            ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[currentVideoID], VIDEO_EVENT_LOAD_OK, this);
             ofNotifyEvent(threadedVideoEvent, videoEvent, this);
         }
         
@@ -160,7 +169,7 @@ void ofxThreadedVideo::threadedFunction(){
                     loadVideoID = -1;
                     
                     // send event notification
-                    ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_FAIL, NULL);
+                    ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_FAIL, this);
                     ofNotifyEvent(threadedVideoEvent, videoEvent, this);
                 }
                 

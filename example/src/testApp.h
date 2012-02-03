@@ -24,5 +24,7 @@ class testApp : public ofBaseApp{
     
         ofxThreadedVideo video1;
         ofxThreadedVideo video2;
+    
+        void threadedVideoEvent(ofxThreadedVideoEvent & event);
 		
 };

@@ -28,18 +28,7 @@ enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_BLOCKED
 };
 
-class ofxThreadedVideoEvent{
-    
-public:
-    
-    ofxThreadedVideoEvent(string _path, ofxThreadedVideoEventType _eventType, ofVideoPlayer * _video)
-    : path(_path), eventType(_eventType), video(_video){};
-    
-    string path;
-    ofxThreadedVideoEventType eventType;
-    ofVideoPlayer * video;
-};
-
+class ofxThreadedVideoEvent;
 class ofxThreadedVideo : public ofThread {
 
 public:
@@ -101,6 +90,24 @@ private:
     ofVideoPlayer videos[2];
     
     int instanceID;
+    
+    // block copy ctor and assignment operator
+    ofxThreadedVideo(const ofxThreadedVideo& other);
+    ofxThreadedVideo& operator=(const ofxThreadedVideo&);
+    
+};
+
+class ofxThreadedVideoEvent{
+    
+public:
+    
+    ofxThreadedVideoEvent(string _path, ofxThreadedVideoEventType _eventType, ofxThreadedVideo * _video)
+    : path(_path), eventType(_eventType), video(_video){eventTypeAsString = _video->getEventTypeAsString(_eventType);};
+    
+    string path;
+    string eventTypeAsString;
+    ofxThreadedVideoEventType eventType;
+    ofxThreadedVideo * video;
     
 };
 
