@@ -180,6 +180,14 @@ void ofxThreadedVideo::threadedFunction(){
             // if we have a movie let's update it
             if(currentVideoID != -1){
                 
+                if (bFastPaused && !videos[currentVideoID].isPaused()) {
+                    videos[currentVideoID].setPaused(true);
+                }
+                
+                if (!bFastPaused && videos[currentVideoID].isPaused()) {
+                    videos[currentVideoID].setPaused(false);
+                }
+                
                 // do non blocking seek to position
                 if(fFastPosition != -1.0f){
                     videos[currentVideoID].setPaused(true);
@@ -190,11 +198,11 @@ void ofxThreadedVideo::threadedFunction(){
                 if(iFastFrame != -1) videos[currentVideoID].setFrame(iFastFrame);
                 
                 // do 'fast' pause by just not updateing the movie unless we're seeking to frame/position
-                if (!bFastPaused || fFastPosition != -1.0f || iFastFrame != -1) videos[currentVideoID].update();
+                if (fFastPosition != -1.0f || iFastFrame != -1) videos[currentVideoID].update();
                 if (videos[currentVideoID].isFrameNew()) bNewFrame = true;
                 
                 // unpause if doing a non blocking seek to position
-                if(fFastPosition != -1.0f) videos[currentVideoID].setPaused(false);
+                if(fFastPosition != -1.0f && !bFastPaused) videos[currentVideoID].setPaused(false);
 
                 fFastPosition = -1.0f;
                 iFastFrame = -1;
