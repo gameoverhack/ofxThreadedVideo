@@ -24,12 +24,12 @@ void testApp::update(){
 //--------------------------------------------------------------
 void testApp::draw(){
     ofSetColor(255, 255, 255);
-    video1.draw(0, 0, 640, 480);
-    video2.draw(640, 0, 640, 480);
+    video1.draw(0, 0, video1.getWidth(), video1.getHeight());
+    video2.draw(video1.getWidth(), 0, video2.getWidth(), video2.getHeight());
     
     ofSetColor(0, 255, 0);
-    int duration1 = video1.getVideo().getDuration();
-    int duration2 = video2.getVideo().getDuration();
+    int duration1 = video1.getDuration();
+    int duration2 = video2.getDuration();
     ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate()) + " duration vid1: " + ofToString(duration1) + " duration vid2: " + ofToString(duration2), 20, ofGetHeight() - 20);
 }
 
@@ -46,10 +46,17 @@ void testApp::keyPressed(int key){
             break;
         case '2':
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
-            break; 
+            break;
         case '3':
             video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
+            break;
+        case '4':
+            video1.setPaused(true);
+            break;
+        case '5':
+            video1.setFrame(0);
+            video1.setPaused(false);
             break; 
         default:
             break;
@@ -68,23 +75,17 @@ void testApp::mouseMoved(int x, int y ){
 
 //--------------------------------------------------------------
 void testApp::mouseDragged(int x, int y, int button){
-    ofVideoPlayer & video = video1.getVideo();
-    video1.setFastFrame(video.getTotalNumFrames() * (float)x/ofGetWidth());
-    //video2.setFastPosition((float)x/ofGetWidth());
+    video1.setFrame(video1.getTotalNumFrames() * (float)x/ofGetWidth());
 }
 
 //--------------------------------------------------------------
 void testApp::mousePressed(int x, int y, int button){
-    //bool bPaused = video1.isFastPaused();
-    //video1.setFastPaused(true);
-    //video2.setFastPaused(true);
+
 }
 
 //--------------------------------------------------------------
 void testApp::mouseReleased(int x, int y, int button){
-    //bool bPaused = video1.isFastPaused();
-    //video1.setFastPaused(false);
-    //video2.setFastPaused(false);
+
 }
 
 //--------------------------------------------------------------

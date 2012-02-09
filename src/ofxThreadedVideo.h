@@ -36,36 +36,74 @@ public:
     ofxThreadedVideo();
     ~ofxThreadedVideo();
 
-    void update();
-
-    void draw();
-    void draw(float x, float y);
-    void draw(float x, float y, float w, float h);
-
-    bool loadMovie(string fileName);
-
+    void setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer);
+    ofPtr<ofBaseVideoPlayer> getPlayer();
+    
     void setUseAutoPlay(bool b);
     bool getUseAutoPlay();
-
+    
     void setUseQueue(bool b);
     bool getUseQueue();
-
-    void setPaused(bool b);
-    bool isPaused();
-
+    
+    bool loadMovie(string name);
+    void setPixelFormat(ofPixelFormat pixelFormat);
+    void closeMovie();
+    void close();
+    
+    void update();
+    void play();
+    void stop();
+    
+    bool isFrameNew();
+    unsigned char * getPixels();
+    ofPixelsRef	getPixelsRef();
+    float getPosition();
+    float getSpeed();
+    float getDuration();
+    bool getIsMovieDone();
+    
     void setPosition(float pct);
+    void setVolume(int volume);
+    void setLoopState(ofLoopType state);
+    int getLoopState();
+    void setSpeed(float speed);
     void setFrame(int frame);
-
-    float getWidth();
+    
+    void setUseTexture(bool bUse);
+    ofTexture &	getTextureReference();
+    void draw(float x, float y, float w, float h);
+    void draw(float x, float y);
+    void draw(const ofPoint & p);
+    void draw(const ofRectangle & r);
+    void draw();
+    
+    void setAnchorPercent(float xPct, float yPct);
+    void setAnchorPoint(float x, float y);
+    void resetAnchor();
+    
+    void setPaused(bool bPause);
+    
+    int getCurrentFrame();
+    int getTotalNumFrames();
+    
+    void firstFrame();
+    void nextFrame();
+    void previousFrame();
+    
     float getHeight();
+    float getWidth();
+    
+    bool isPaused();
+    bool isLoaded();
+    bool isPlaying();
 
-    ofVideoPlayer & getVideo();
-    ofTexture & getTextureReference();
-
+    //float width, height;
+    
+    string getName();
     string getPath();
 
     ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
-    inline string getEventTypeAsString(ofxThreadedVideoEventType eventType);
+    string getEventTypeAsString(ofxThreadedVideoEventType eventType);
 
 protected:
 
@@ -73,27 +111,38 @@ protected:
 
 private:
 
+    static const int VIDEO_NONE = -1;
+    static const int VIDEO_FLIP = 0;
+    static const int VIDEO_FLOP = 1;
+    
+    void updatePixels(int videoID);
+    void updateTexture(int videoID);
+    
     int loadVideoID;
     int currentVideoID;
-    int videoIDCounter;
 
     string loadPath;
 
-    float fFastPosition;
-    int iFastFrame;
-
+    float newPosition;
+    int newFrame;
+    bool bPaused;
+    bool bUseTexture;
+    
     bool bUseAutoPlay;
     bool bUseQueue;
-    bool bFastPaused;
-    bool bNewFrame;
 
     queue<string> pathsToLoad;
     string paths[2];
+    string names[2];
+    bool bFrameNew[2];
+    ofPixels * pixels[2];
     ofTexture textures[2];
     ofVideoPlayer videos[2];
 
     int instanceID;
 
+    ofPixelFormat internalPixelFormat;
+    
     // block copy ctor and assignment operator
     ofxThreadedVideo(const ofxThreadedVideo& other);
     ofxThreadedVideo& operator=(const ofxThreadedVideo&);
