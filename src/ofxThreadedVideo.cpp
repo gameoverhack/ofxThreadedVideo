@@ -88,7 +88,7 @@ bool ofxThreadedVideo::getUseQueue(){
 bool ofxThreadedVideo::loadMovie(string fileName){
 
     // check if we're using a queue or only allowing one file to load at a time
-    if (!bUseQueue && pathsToLoad.size() > 0) {
+    if (!bUseQueue && pathsToLoad.size() > 0 || !lock()) {
         ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
 
         // send event notification
@@ -100,6 +100,7 @@ bool ofxThreadedVideo::loadMovie(string fileName){
 
     // put the movie path in a queue
     pathsToLoad.push(ofToDataPath(fileName));
+    unlock();
     return true;
 }
 
@@ -154,6 +155,7 @@ void ofxThreadedVideo::update(){
                 // close the last movie - we do this here because
                 // ofQuicktimeVideo chokes if you try to close in a thread
                 if(lastVideoID != VIDEO_NONE){
+                    ofLogVerbose() << "Closing last video" << lastVideoID;
                     paths[lastVideoID] = names[lastVideoID] = "";
                     videos[lastVideoID].close();
                     bFrameNew[lastVideoID] = false;
