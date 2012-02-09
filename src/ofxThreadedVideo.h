@@ -38,22 +38,22 @@ public:
 
     void setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer);
     ofPtr<ofBaseVideoPlayer> getPlayer();
-    
+
     void setUseAutoPlay(bool b);
     bool getUseAutoPlay();
-    
+
     void setUseQueue(bool b);
     bool getUseQueue();
-    
+
     bool loadMovie(string name);
     void setPixelFormat(ofPixelFormat pixelFormat);
     void closeMovie();
     void close();
-    
+
     void update();
     void play();
     void stop();
-    
+
     bool isFrameNew();
     unsigned char * getPixels();
     ofPixelsRef	getPixelsRef();
@@ -61,14 +61,14 @@ public:
     float getSpeed();
     float getDuration();
     bool getIsMovieDone();
-    
+
     void setPosition(float pct);
     void setVolume(int volume);
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
     void setFrame(int frame);
-    
+
     void setUseTexture(bool bUse);
     ofTexture &	getTextureReference();
     void draw(float x, float y, float w, float h);
@@ -76,31 +76,33 @@ public:
     void draw(const ofPoint & p);
     void draw(const ofRectangle & r);
     void draw();
-    
+
     void setAnchorPercent(float xPct, float yPct);
     void setAnchorPoint(float x, float y);
     void resetAnchor();
-    
+
     void setPaused(bool bPause);
-    
+
     int getCurrentFrame();
     int getTotalNumFrames();
-    
+
     void firstFrame();
     void nextFrame();
     void previousFrame();
-    
+
     float getHeight();
     float getWidth();
-    
+
     bool isPaused();
     bool isLoaded();
     bool isPlaying();
 
     //float width, height;
-    
+
     string getName();
     string getPath();
+
+    double getFrameRate();
 
     ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
     string getEventTypeAsString(ofxThreadedVideoEventType eventType);
@@ -114,10 +116,10 @@ private:
     static const int VIDEO_NONE = -1;
     static const int VIDEO_FLIP = 0;
     static const int VIDEO_FLOP = 1;
-    
+
     void updatePixels(int videoID);
     void updateTexture(int videoID);
-    
+
     int loadVideoID;
     int currentVideoID;
 
@@ -127,7 +129,7 @@ private:
     int newFrame;
     bool bPaused;
     bool bUseTexture;
-    
+
     bool bUseAutoPlay;
     bool bUseQueue;
 
@@ -139,10 +141,10 @@ private:
     ofTexture textures[2];
     ofVideoPlayer videos[2];
 
-    int instanceID;
-
     ofPixelFormat internalPixelFormat;
-    
+
+    double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
+
     // block copy ctor and assignment operator
     ofxThreadedVideo(const ofxThreadedVideo& other);
     ofxThreadedVideo& operator=(const ofxThreadedVideo&);

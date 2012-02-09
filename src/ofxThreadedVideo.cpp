@@ -30,10 +30,12 @@ ofxThreadedVideo::ofxThreadedVideo(){
     newFrame = -1;
     bPaused = false;
     bUseTexture = true;
-    
+
     bUseAutoPlay = true;
     bUseQueue = false;
-    
+
+    prevMillis = ofGetElapsedTimeMillis();
+    lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
 
     // let's go!
     startThread(false, false);
@@ -48,7 +50,6 @@ ofxThreadedVideo::~ofxThreadedVideo(){
     // close anything left open
     videos[0].close();
     videos[1].close();
-    paths[0] = paths[1] = "";
 
 }
 
@@ -128,7 +129,7 @@ void ofxThreadedVideo::update(){
 
         // check for a new frame for current video
         updateTexture(currentVideoID);
-        
+
         // check if we're loading a video
         if(loadVideoID != VIDEO_NONE){
 
@@ -140,16 +141,16 @@ void ofxThreadedVideo::update(){
                 ofLogVerbose() << "Allocating texture" << loadVideoID << w << h;
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
-            
+
             // check for a new frame for loading video
             if(bFrameNew[loadVideoID]){
                 updateTexture(loadVideoID);
-                
+
                 // switch the current movie ID to the one we just loaded
                 int lastVideoID = currentVideoID;
                 currentVideoID = loadVideoID;
                 loadVideoID = VIDEO_NONE;
-                
+
                 // close the last movie - we do this here because
                 // ofQuicktimeVideo chokes if you try to close in a thread
                 if(lastVideoID != VIDEO_NONE){
@@ -168,14 +169,26 @@ void ofxThreadedVideo::update(){
                 ofNotifyEvent(threadedVideoEvent, videoEvent, this);
             }
         }
-        
+
         // if there's a movie in the queue
         if(pathsToLoad.size() > 0){
             // ...let's start trying to load it!
             loadPath = pathsToLoad.front();
             pathsToLoad.pop();
         };
-        
+
+        // calculate frameRate -> taken from ofAppRunner
+        prevMillis = ofGetElapsedTimeMillis();
+        timeNow = ofGetElapsedTimef();
+        double diff = timeNow-timeThen;
+        if( diff  > 0.00001 ){
+            fps			= 1.0 / diff;
+            frameRate	*= 0.9f;
+            frameRate	+= 0.1f*fps;
+        }
+        lastFrameTime	= diff;
+        timeThen		= timeNow;
+
         unlock();
     }
 }
@@ -201,7 +214,7 @@ void ofxThreadedVideo::updateTexture(int videoID){
             float h = videos[videoID].getHeight();
             textures[videoID].loadData(pixels[videoID]->getPixels(), w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
         }
-        
+
         bFrameNew[videoID] = false;
     }
 }
@@ -234,7 +247,7 @@ void ofxThreadedVideo::threadedFunction(){
                 if(videos[loadVideoID].loadMovie(loadPath)){
 
                     ofLogVerbose() << "Loaded" << loadPath;
-                    
+
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
@@ -256,22 +269,22 @@ void ofxThreadedVideo::threadedFunction(){
                 ofxThreadedVideoMutex.unlock();
                 loadPath = "";
             }
-            
+
             if(loadVideoID != VIDEO_NONE){
                 updatePixels(loadVideoID);
             }
-            
+
             // if we have a movie let's update it
             if(currentVideoID != VIDEO_NONE){
-                
+
                 if (bPaused && !videos[currentVideoID].isPaused()) {
                     videos[currentVideoID].setPaused(true);
                 }
-                
+
                 if (!bPaused && videos[currentVideoID].isPaused()) {
                     videos[currentVideoID].setPaused(false);
                 }
-                
+
                 // do non blocking seek to position
                 if(newPosition != -1.0f){
                     if(!bPaused) videos[currentVideoID].setPaused(true);
@@ -294,7 +307,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
 
             #if defined(TARGET_WIN32)
-            ofSleepMillis(1000/25); // have to sleep just a bit otherwise update never happens on Windows!!
+            ofSleepMillis(1000/25); // TODO: implement target frame rate? US might need 30 here?
             #endif
         }
     }
@@ -596,6 +609,11 @@ string ofxThreadedVideo::getPath(){
     }else{
         return "";
     }
+}
+
+//--------------------------------------------------------------
+double ofxThreadedVideo::getFrameRate(){
+    return frameRate;
 }
 
 //--------------------------------------------------------------
