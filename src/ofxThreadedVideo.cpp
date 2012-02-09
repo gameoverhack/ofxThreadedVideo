@@ -239,7 +239,7 @@ void ofxThreadedVideo::threadedFunction(){
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
                     paths[loadVideoID] = loadPath;
-                    vector<string> pathParts = ofSplitString(paths[currentVideoID], "/");
+                    vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
                     names[loadVideoID] = pathParts[pathParts.size() - 1];
                     bFrameNew[loadVideoID] = false;
 
