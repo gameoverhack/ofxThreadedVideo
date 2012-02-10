@@ -25,7 +25,8 @@
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
     VIDEO_EVENT_LOAD_FAIL,
-    VIDEO_EVENT_LOAD_BLOCKED
+    VIDEO_EVENT_LOAD_BLOCKED,
+    VIDEO_EVENT_LOAD_THREADBLOCKED
 };
 
 class ofxThreadedVideoEvent;

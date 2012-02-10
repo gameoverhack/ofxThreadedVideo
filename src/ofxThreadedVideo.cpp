@@ -88,20 +88,20 @@ bool ofxThreadedVideo::getUseQueue(){
 bool ofxThreadedVideo::loadMovie(string fileName){
 
     // check if we're using a queue or only allowing one file to load at a time
-    if (!bUseQueue && pathsToLoad.size() > 0 || !lock()) {
+    if (!bUseQueue && pathsToLoad.size() > 0){
         ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
-
+        
         // send event notification
         ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_BLOCKED, this);
         ofNotifyEvent(threadedVideoEvent, videoEvent, this);
-
+        
         return false;
     }
-
+    
     // put the movie path in a queue
     pathsToLoad.push(ofToDataPath(fileName));
-    unlock();
     return true;
+    
 }
 
 //--------------------------------------------------------------
@@ -157,7 +157,7 @@ void ofxThreadedVideo::update(){
                 if(lastVideoID != VIDEO_NONE){
                     ofLogVerbose() << "Closing last video" << lastVideoID;
                     paths[lastVideoID] = names[lastVideoID] = "";
-                    videos[lastVideoID].close();
+                    videos[lastVideoID].stop();
                     bFrameNew[lastVideoID] = false;
                     // reset properties ??
                     newPosition = -1.0f;
@@ -173,7 +173,7 @@ void ofxThreadedVideo::update(){
         }
 
         // if there's a movie in the queue
-        if(pathsToLoad.size() > 0){
+        if(pathsToLoad.size() > 0 && loadPath == "" && loadVideoID == VIDEO_NONE){
             // ...let's start trying to load it!
             loadPath = pathsToLoad.front();
             pathsToLoad.pop();
@@ -199,12 +199,7 @@ void ofxThreadedVideo::update(){
 void ofxThreadedVideo::updatePixels(int videoID){
     videos[videoID].update();
     if (videos[videoID].isFrameNew()){
-        // get the pixels
-        pixels[videoID] = &videos[videoID].getPixelsRef();
-        // make sure we don't have NULL pixels
-        if(pixels[videoID]->getPixels() != NULL){
-            bFrameNew[videoID] = true;
-        }
+        bFrameNew[videoID] = true;
     }
 }
 
@@ -212,9 +207,12 @@ void ofxThreadedVideo::updatePixels(int videoID){
 void ofxThreadedVideo::updateTexture(int videoID){
     if(videoID != VIDEO_NONE){
         if(bUseTexture){
-            float w = videos[videoID].getWidth();
-            float h = videos[videoID].getHeight();
-            textures[videoID].loadData(pixels[videoID]->getPixels(), w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
+            // make sure we don't have NULL pixels
+            if(pixels[videoID]->getPixels() != NULL && textures[videoID].isAllocated()){
+                float w = videos[videoID].getWidth();
+                float h = videos[videoID].getHeight();
+                textures[videoID].loadData(pixels[videoID]->getPixels(), w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
+            }
         }
 
         bFrameNew[videoID] = false;
@@ -242,20 +240,26 @@ void ofxThreadedVideo::threadedFunction(){
                         break;
                 }
 
+                paths[loadVideoID] = loadPath;
+                loadPath = "";
+                
+                vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
+                names[loadVideoID] = pathParts[pathParts.size() - 1];
+                
                 // using a static mutex blocks all threads (including the main app) until we've loaded
                 ofxThreadedVideoMutex.lock();
-
+                cout << paths[loadVideoID] << endl;
                 // load that movie!
-                if(videos[loadVideoID].loadMovie(loadPath)){
+                if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
 
-                    ofLogVerbose() << "Loaded" << loadPath;
+                    ofLogVerbose() << "Loaded" << names[loadVideoID];
 
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
+                    
+                    // set pixel refs
+                    pixels[loadVideoID] = &videos[loadVideoID].getPixelsRef();
 
-                    paths[loadVideoID] = loadPath;
-                    vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
-                    names[loadVideoID] = pathParts[pathParts.size() - 1];
                     bFrameNew[loadVideoID] = false;
 
                 }else{
@@ -264,12 +268,13 @@ void ofxThreadedVideo::threadedFunction(){
                     loadVideoID = VIDEO_NONE;
 
                     // send event notification
-                    ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_FAIL, this);
+                    ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[loadVideoID], VIDEO_EVENT_LOAD_FAIL, this);
                     ofNotifyEvent(threadedVideoEvent, videoEvent, this);
                 }
-
+                
+                
                 ofxThreadedVideoMutex.unlock();
-                loadPath = "";
+                
             }
 
             if(loadVideoID != VIDEO_NONE){
@@ -629,6 +634,8 @@ string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventTyp
             break;
         case VIDEO_EVENT_LOAD_BLOCKED:
             return "VIDEO_EVENT_LOAD_BLOCKED";
+        case VIDEO_EVENT_LOAD_THREADBLOCKED:
+            return "VIDEO_EVENT_LOAD_THREADBLOCKED";
             break;
     }
 }
