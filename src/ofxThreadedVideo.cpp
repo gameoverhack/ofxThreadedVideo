@@ -26,18 +26,19 @@ ofxThreadedVideo::ofxThreadedVideo(){
     currentVideoID = VIDEO_NONE;
     loadPath = "";
 
-    newPosition = -1.0f;
-    newFrame = -1;
-    bPaused = false;
+    newPosition[0] = newPosition[1] = -1.0f;
+    newFrame[0] = newFrame[1] = -1;
+    bPaused[0] = bPaused[1] = false;
     bUseTexture = true;
-
+    volume[0] = volume[1] = 255;
+    newSpeed[0] = newSpeed[1] = 1.0f;
+    //newLoopState[0] = newLoopState[1] = OF_LOOP_NORMAL;
+    
     bUseAutoPlay = true;
     bUseQueue = false;
 
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
-
-    volume = 255;
 
     // let's go!
     startThread(false, false);
@@ -116,7 +117,7 @@ void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
 //--------------------------------------------------------------
 void ofxThreadedVideo::closeMovie(){
     if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].closeMovie();
+        videos[currentVideoID].closeMovie();
     }
 }
 
@@ -144,7 +145,7 @@ void ofxThreadedVideo::update(){
                 ofLogVerbose() << "Allocating texture" << loadVideoID << w << h;
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
-
+            
             // check for a new frame for loading video
             if(bFrameNew[loadVideoID]){
                 updateTexture(loadVideoID);
@@ -153,7 +154,6 @@ void ofxThreadedVideo::update(){
                 int lastVideoID = currentVideoID;
                 currentVideoID = loadVideoID;
                 loadVideoID = VIDEO_NONE;
-                volume = 255;
 
                 // close the last movie - we do this here because
                 // ofQuicktimeVideo chokes if you try to close in a thread
@@ -161,12 +161,16 @@ void ofxThreadedVideo::update(){
                     ofLogVerbose() << "Closing last video" << lastVideoID;
                     paths[lastVideoID] = names[lastVideoID] = "";
                     videos[lastVideoID].stop();
+                    
+                    // reset properties to defaults
+                    newPosition[lastVideoID] = -1.0f;
+                    newFrame[lastVideoID] = -1;
+                    newSpeed[lastVideoID] = 1.0f;
+                    //newLoopState[lastVideoID] = OF_LOOP_NORMAL;
+                    
                     bFrameNew[lastVideoID] = false;
-                    // reset properties ??
-                    newPosition = -1.0f;
-                    newFrame = -1;
-                    bPaused = false;
-                    //bUseTexture = true;
+                    bPaused[lastVideoID] = false;
+                    volume[lastVideoID] = 255;
                 }
 
                 // send event notification
@@ -226,34 +230,43 @@ void ofxThreadedVideo::updateVideo(int videoID){
 
     if(videoID != VIDEO_NONE){
 
-        if (bPaused && !videos[videoID].isPaused()) {
+        if(newSpeed[videoID] != videos[videoID].getSpeed()){
+            videos[videoID].setSpeed(newSpeed[videoID]);
+        }
+        
+        //if(newLoopState[videoID] != videos[videoID].getLoopState()){
+        //    videos[videoID].setLoopState(newLoopState[videoID]);
+        //}
+        cout << (videoID) << " " << bPaused[videoID] << " " << videos[videoID].isPaused() << endl;
+        if (bPaused[videoID] && !videos[videoID].isPaused()){
+            cout << "here" << endl;
             videos[videoID].setPaused(true);
         }
 
-        if (!bPaused && videos[videoID].isPaused()) {
+        if (!bPaused[videoID] && videos[videoID].isPaused()){
             videos[videoID].setPaused(false);
         }
 
         // do non blocking seek to position
-        if(newPosition != -1.0f){
-            if(!bPaused) videos[videoID].setPaused(true);
-            videos[videoID].setPosition(newPosition);
+        if(newPosition[videoID] != -1.0f){
+            if(!bPaused[videoID]) videos[videoID].setPaused(true);
+            videos[videoID].setPosition(newPosition[videoID]);
         }
 
         // do non blocking seek to frame
-        if(newFrame != -1){
-            CLAMP(newFrame, 0, videos[videoID].getTotalNumFrames());
-            videos[videoID].setFrame(newFrame);
+        if(newFrame[videoID] != -1){
+            CLAMP(newFrame[videoID], 0, videos[videoID].getTotalNumFrames());
+            videos[videoID].setFrame(newFrame[videoID]);
         }
 
         // update current video
         updatePixels(videoID);
 
         // unpause if doing a non blocking seek to position
-        if(newPosition != -1.0f && !bPaused) videos[videoID].setPaused(false);
+        if(newPosition[videoID] != -1.0f && !bPaused[videoID]) videos[videoID].setPaused(false);
 
-        newPosition = -1.0f;
-        newFrame = -1;
+        newPosition[videoID] = -1.0f;
+        newFrame[videoID] = -1;
     }
 }
 
@@ -267,16 +280,7 @@ void ofxThreadedVideo::threadedFunction(){
             // if there's a movie to load...
             if(loadPath != ""){
 
-                // get the free slot in our videos array
-                switch (currentVideoID) {
-                    case VIDEO_NONE:
-                    case VIDEO_FLOP:
-                        loadVideoID = VIDEO_FLIP;
-                        break;
-                    case VIDEO_FLIP:
-                        loadVideoID = VIDEO_FLOP;
-                        break;
-                }
+                loadVideoID = getNextLoadID();
 
                 paths[loadVideoID] = loadPath;
                 loadPath = "";
@@ -290,15 +294,13 @@ void ofxThreadedVideo::threadedFunction(){
                 // load that movie!
                 if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
 
-                    ofLogVerbose() << "Loaded" << names[loadVideoID];
+                    ofLogVerbose() << "Loaded" << names[loadVideoID] << " " << loadVideoID;
 
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
                     // set pixel refs
                     pixels[loadVideoID] = &videos[loadVideoID].getPixelsRef();
-
-                    bFrameNew[loadVideoID] = false;
 
                 }else{
 
@@ -329,6 +331,20 @@ void ofxThreadedVideo::threadedFunction(){
 }
 
 //--------------------------------------------------------------
+int ofxThreadedVideo::getNextLoadID(){
+    // get the free slot in our videos array
+    switch (currentVideoID) {
+        case VIDEO_NONE:
+        case VIDEO_FLOP:
+            return VIDEO_FLIP;
+            break;
+        case VIDEO_FLIP:
+            return VIDEO_FLOP;
+            break;
+    }
+}
+
+//--------------------------------------------------------------
 void ofxThreadedVideo::play(){
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].play();
@@ -345,7 +361,6 @@ void ofxThreadedVideo::stop(){
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFrameNew(){
     if(currentVideoID != VIDEO_NONE){
-        //return videos[currentVideoID].isFrameNew();
         return bFrameNew[currentVideoID];
     }else{
         return false;
@@ -355,7 +370,6 @@ bool ofxThreadedVideo::isFrameNew(){
 //--------------------------------------------------------------
 unsigned char * ofxThreadedVideo::getPixels(){
     if(currentVideoID != VIDEO_NONE){
-        //return videos[currentVideoID].getPixels();
         return pixels[currentVideoID]->getPixels();
     }else{
         return NULL;
@@ -407,32 +421,36 @@ bool ofxThreadedVideo::getIsMovieDone(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPosition(float pct){
-    if(currentVideoID != VIDEO_NONE){
-        CLAMP(pct, 0.0f, 1.0f);
-        newPosition = pct;
+    CLAMP(pct, 0.0f, 1.0f);
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        newPosition[currentVideoID] = pct;
     }
+    newPosition[getNextLoadID()] = pct;
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setVolume(int _volume){
-    if(currentVideoID != VIDEO_NONE){
-        volume = _volume;
-        videos[currentVideoID].setVolume(volume);
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        volume[currentVideoID] = _volume;
+        videos[currentVideoID].setVolume(volume[currentVideoID]);
     }
+    volume[getNextLoadID()] = _volume;
+    videos[getNextLoadID()].setVolume(volume[getNextLoadID()]);
 }
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getVolume(){
     if(currentVideoID != VIDEO_NONE){
-        return volume; // videos[currentVideoID].getVolume(); this should be implemented in OF!
+        return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setLoopState(ofLoopType state){
-    if(currentVideoID != VIDEO_NONE){
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         videos[currentVideoID].setLoopState(state);
     }
+    videos[getNextLoadID()].setLoopState(state);
 }
 
 //--------------------------------------------------------------
@@ -446,19 +464,25 @@ int ofxThreadedVideo::getLoopState(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setSpeed(float speed){
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].setSpeed(speed);
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        newSpeed[currentVideoID] = speed;
     }
+    newSpeed[getNextLoadID()] = speed;
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setFrame(int frame){
-    newFrame = frame;
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        newFrame[currentVideoID] = frame;
+    }
+    newFrame[getNextLoadID()] = frame;
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setUseTexture(bool b){
-    bUseTexture = b;
+    // this is for ofxThreadedVideo since the ofVideoPlayers 
+    // intances don't use textures internally
+    bUseTexture = b; 
 }
 
 //--------------------------------------------------------------
@@ -529,7 +553,10 @@ void ofxThreadedVideo::resetAnchor(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPaused(bool b){
-    bPaused = b;
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        bPaused[currentVideoID] = b;
+    }
+    bPaused[getNextLoadID()] = b;
 }
 
 //--------------------------------------------------------------
@@ -537,7 +564,7 @@ int ofxThreadedVideo::getCurrentFrame(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getCurrentFrame();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -546,7 +573,7 @@ int ofxThreadedVideo::getTotalNumFrames(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getTotalNumFrames();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -570,7 +597,7 @@ float ofxThreadedVideo::getWidth(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getWidth();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -579,7 +606,7 @@ float ofxThreadedVideo::getHeight(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getHeight();
     }else{
-        return NULL;
+        return 0;
     }
 }
 

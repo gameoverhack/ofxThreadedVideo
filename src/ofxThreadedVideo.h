@@ -123,20 +123,24 @@ private:
     void updateTexture(int videoID);
     void updateVideo(int videoID);
 
+    int getNextLoadID();
+    
     int loadVideoID;
     int currentVideoID;
 
     string loadPath;
 
-    float newPosition;
-    int newFrame;
-    int volume;
-    bool bPaused;
-    bool bUseTexture;
+    float newPosition[2];
+    int newFrame[2];
+    int volume[2];
+    bool bPaused[2];
+    float newSpeed[2];
+    ofLoopType newLoopState[2];
 
     bool bUseAutoPlay;
     bool bUseQueue;
-
+    bool bUseTexture;
+    
     queue<string> pathsToLoad;
     string paths[2];
     string names[2];
