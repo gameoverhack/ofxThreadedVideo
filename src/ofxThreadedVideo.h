@@ -65,6 +65,7 @@ public:
 
     void setPosition(float pct);
     void setVolume(int volume);
+    int getVolume();
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
@@ -120,6 +121,7 @@ private:
 
     void updatePixels(int videoID);
     void updateTexture(int videoID);
+    void updateVideo(int videoID);
 
     int loadVideoID;
     int currentVideoID;
@@ -128,6 +130,7 @@ private:
 
     float newPosition;
     int newFrame;
+    int volume;
     bool bPaused;
     bool bUseTexture;
 

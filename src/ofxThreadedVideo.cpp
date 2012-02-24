@@ -37,6 +37,8 @@ ofxThreadedVideo::ofxThreadedVideo(){
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
 
+    volume = 255;
+
     // let's go!
     startThread(false, false);
 }
@@ -90,18 +92,18 @@ bool ofxThreadedVideo::loadMovie(string fileName){
     // check if we're using a queue or only allowing one file to load at a time
     if (!bUseQueue && pathsToLoad.size() > 0){
         ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
-        
+
         // send event notification
         ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_BLOCKED, this);
         ofNotifyEvent(threadedVideoEvent, videoEvent, this);
-        
+
         return false;
     }
-    
+
     // put the movie path in a queue
     pathsToLoad.push(ofToDataPath(fileName));
     return true;
-    
+
 }
 
 //--------------------------------------------------------------
@@ -151,6 +153,7 @@ void ofxThreadedVideo::update(){
                 int lastVideoID = currentVideoID;
                 currentVideoID = loadVideoID;
                 loadVideoID = VIDEO_NONE;
+                volume = 255;
 
                 // close the last movie - we do this here because
                 // ofQuicktimeVideo chokes if you try to close in a thread
@@ -219,6 +222,41 @@ void ofxThreadedVideo::updateTexture(int videoID){
     }
 }
 
+void ofxThreadedVideo::updateVideo(int videoID){
+
+    if(videoID != VIDEO_NONE){
+
+        if (bPaused && !videos[videoID].isPaused()) {
+            videos[videoID].setPaused(true);
+        }
+
+        if (!bPaused && videos[videoID].isPaused()) {
+            videos[videoID].setPaused(false);
+        }
+
+        // do non blocking seek to position
+        if(newPosition != -1.0f){
+            if(!bPaused) videos[videoID].setPaused(true);
+            videos[videoID].setPosition(newPosition);
+        }
+
+        // do non blocking seek to frame
+        if(newFrame != -1){
+            CLAMP(newFrame, 0, videos[videoID].getTotalNumFrames());
+            videos[videoID].setFrame(newFrame);
+        }
+
+        // update current video
+        updatePixels(videoID);
+
+        // unpause if doing a non blocking seek to position
+        if(newPosition != -1.0f && !bPaused) videos[videoID].setPaused(false);
+
+        newPosition = -1.0f;
+        newFrame = -1;
+    }
+}
+
 //--------------------------------------------------------------
 void ofxThreadedVideo::threadedFunction(){
 
@@ -242,10 +280,10 @@ void ofxThreadedVideo::threadedFunction(){
 
                 paths[loadVideoID] = loadPath;
                 loadPath = "";
-                
+
                 vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
                 names[loadVideoID] = pathParts[pathParts.size() - 1];
-                
+
                 // using a static mutex blocks all threads (including the main app) until we've loaded
                 ofxThreadedVideoMutex.lock();
                 cout << paths[loadVideoID] << endl;
@@ -256,7 +294,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
-                    
+
                     // set pixel refs
                     pixels[loadVideoID] = &videos[loadVideoID].getPixelsRef();
 
@@ -271,45 +309,15 @@ void ofxThreadedVideo::threadedFunction(){
                     ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[loadVideoID], VIDEO_EVENT_LOAD_FAIL, this);
                     ofNotifyEvent(threadedVideoEvent, videoEvent, this);
                 }
-                
-                
+
+
                 ofxThreadedVideoMutex.unlock();
-                
+
             }
 
-            if(loadVideoID != VIDEO_NONE){
-                updatePixels(loadVideoID);
-            }
-
-            // if we have a movie let's update it
-            if(currentVideoID != VIDEO_NONE){
-
-                if (bPaused && !videos[currentVideoID].isPaused()) {
-                    videos[currentVideoID].setPaused(true);
-                }
-
-                if (!bPaused && videos[currentVideoID].isPaused()) {
-                    videos[currentVideoID].setPaused(false);
-                }
-
-                // do non blocking seek to position
-                if(newPosition != -1.0f){
-                    if(!bPaused) videos[currentVideoID].setPaused(true);
-                    videos[currentVideoID].setPosition(newPosition);
-                }
-
-                // do non blocking seek to frame
-                if(newFrame != -1) videos[currentVideoID].setFrame(newFrame);
-
-                // update current video
-                updatePixels(currentVideoID);
-
-                // unpause if doing a non blocking seek to position
-                if(newPosition != -1.0f && !bPaused) videos[currentVideoID].setPaused(false);
-
-                newPosition = -1.0f;
-                newFrame = -1;
-            }
+            // do threaded update of videos
+            updateVideo(currentVideoID);
+            updateVideo(loadVideoID);
 
             unlock();
 
@@ -406,9 +414,17 @@ void ofxThreadedVideo::setPosition(float pct){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setVolume(int volume){
+void ofxThreadedVideo::setVolume(int _volume){
     if(currentVideoID != VIDEO_NONE){
+        volume = _volume;
         videos[currentVideoID].setVolume(volume);
+    }
+}
+
+//--------------------------------------------------------------
+int ofxThreadedVideo::getVolume(){
+    if(currentVideoID != VIDEO_NONE){
+        return volume; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
 }
 
@@ -437,10 +453,7 @@ void ofxThreadedVideo::setSpeed(float speed){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setFrame(int frame){
-    if(currentVideoID != VIDEO_NONE){
-        CLAMP(frame, 0, videos[currentVideoID].getTotalNumFrames());
-        newFrame = frame;
-    }
+    newFrame = frame;
 }
 
 //--------------------------------------------------------------
