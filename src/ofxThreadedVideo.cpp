@@ -131,9 +131,6 @@ void ofxThreadedVideo::update(){
 
     if(lock()){
 
-        // check for a new frame for current video
-        updateTexture(currentVideoID);
-
         // check if we're loading a video
         if(loadVideoID != VIDEO_NONE){
 
@@ -146,10 +143,9 @@ void ofxThreadedVideo::update(){
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
             
-            // check for a new frame for loading video
+            // check for a new frame before loading video
             if(bFrameNew[loadVideoID]){
-                updateTexture(loadVideoID);
-
+                
                 // switch the current movie ID to the one we just loaded
                 int lastVideoID = currentVideoID;
                 currentVideoID = loadVideoID;
@@ -179,6 +175,9 @@ void ofxThreadedVideo::update(){
             }
         }
 
+        // check for a new frame for current video
+        updateTexture(currentVideoID);
+        
         // if there's a movie in the queue
         if(pathsToLoad.size() > 0 && loadPath == "" && loadVideoID == VIDEO_NONE){
             // ...let's start trying to load it!
@@ -237,9 +236,8 @@ void ofxThreadedVideo::updateVideo(int videoID){
         //if(newLoopState[videoID] != videos[videoID].getLoopState()){
         //    videos[videoID].setLoopState(newLoopState[videoID]);
         //}
-        cout << (videoID) << " " << bPaused[videoID] << " " << videos[videoID].isPaused() << endl;
+
         if (bPaused[videoID] && !videos[videoID].isPaused()){
-            cout << "here" << endl;
             videos[videoID].setPaused(true);
         }
 
@@ -290,7 +288,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                 // using a static mutex blocks all threads (including the main app) until we've loaded
                 ofxThreadedVideoMutex.lock();
-                cout << paths[loadVideoID] << endl;
+                
                 // load that movie!
                 if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
 
