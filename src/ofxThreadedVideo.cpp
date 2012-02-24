@@ -322,7 +322,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
 
             // sleep a bit so we don't thrash the cores!!
-            ofSleepMillis(1000/25); // TODO: implement target frame rate? US might need 30 here?
+            ofSleepMillis(1000/30); // TODO: implement target frame rate? US might need 30 here?
 
         }
     }
