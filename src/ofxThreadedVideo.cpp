@@ -341,6 +341,7 @@ int ofxThreadedVideo::getNextLoadID(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::play(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].play();
     }
@@ -348,6 +349,7 @@ void ofxThreadedVideo::play(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::stop(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].stop();
     }
@@ -355,6 +357,7 @@ void ofxThreadedVideo::stop(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFrameNew(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return bFrameNew[currentVideoID];
     }else{
@@ -364,6 +367,7 @@ bool ofxThreadedVideo::isFrameNew(){
 
 //--------------------------------------------------------------
 unsigned char * ofxThreadedVideo::getPixels(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return pixels[currentVideoID]->getPixels();
     }else{
@@ -373,6 +377,7 @@ unsigned char * ofxThreadedVideo::getPixels(){
 
 //--------------------------------------------------------------
 ofPixelsRef ofxThreadedVideo::getPixelsRef(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getPixelsRef();
     }
@@ -380,6 +385,7 @@ ofPixelsRef ofxThreadedVideo::getPixelsRef(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getPosition(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getPosition();
     }else{
@@ -389,6 +395,7 @@ float ofxThreadedVideo::getPosition(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getSpeed(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getSpeed();
     }else{
@@ -398,6 +405,7 @@ float ofxThreadedVideo::getSpeed(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getDuration(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getDuration();
     }else{
@@ -407,6 +415,7 @@ float ofxThreadedVideo::getDuration(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::getIsMovieDone(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getIsMovieDone();
     }else{
@@ -416,6 +425,7 @@ bool ofxThreadedVideo::getIsMovieDone(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPosition(float pct){
+    Poco::ScopedLock<ofMutex> lock();
     CLAMP(pct, 0.0f, 1.0f);
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         newPosition[currentVideoID] = pct;
@@ -425,6 +435,7 @@ void ofxThreadedVideo::setPosition(float pct){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setVolume(int _volume){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         volume[currentVideoID] = _volume;
         videos[currentVideoID].setVolume(volume[currentVideoID]);
@@ -435,6 +446,7 @@ void ofxThreadedVideo::setVolume(int _volume){
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getVolume(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
@@ -442,6 +454,7 @@ int ofxThreadedVideo::getVolume(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setLoopState(ofLoopType state){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         videos[currentVideoID].setLoopState(state);
     }
@@ -450,6 +463,7 @@ void ofxThreadedVideo::setLoopState(ofLoopType state){
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getLoopState(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getLoopState();
     }else{
@@ -459,6 +473,7 @@ int ofxThreadedVideo::getLoopState(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setSpeed(float speed){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         newSpeed[currentVideoID] = speed;
     }
@@ -467,6 +482,7 @@ void ofxThreadedVideo::setSpeed(float speed){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setFrame(int frame){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         newFrame[currentVideoID] = frame;
     }
@@ -475,6 +491,7 @@ void ofxThreadedVideo::setFrame(int frame){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setUseTexture(bool b){
+    Poco::ScopedLock<ofMutex> lock();
     // this is for ofxThreadedVideo since the ofVideoPlayers 
     // intances don't use textures internally
     bUseTexture = b; 
@@ -482,6 +499,7 @@ void ofxThreadedVideo::setUseTexture(bool b){
 
 //--------------------------------------------------------------
 ofTexture & ofxThreadedVideo::getTextureReference(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return textures[currentVideoID];
     }else{
@@ -492,6 +510,7 @@ ofTexture & ofxThreadedVideo::getTextureReference(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
         textures[currentVideoID].draw(x, y, w, h);
     }
@@ -499,6 +518,7 @@ void ofxThreadedVideo::draw(float x, float y, float w, float h){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
         textures[currentVideoID].draw(x, y, videos[currentVideoID].getWidth(), videos[currentVideoID].getHeight());
     }
@@ -506,6 +526,7 @@ void ofxThreadedVideo::draw(float x, float y){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(const ofPoint & p){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
         textures[currentVideoID].draw(p);
     }
@@ -513,6 +534,7 @@ void ofxThreadedVideo::draw(const ofPoint & p){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(const ofRectangle & r){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
         textures[currentVideoID].draw(r);
     }
@@ -520,6 +542,7 @@ void ofxThreadedVideo::draw(const ofRectangle & r){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
         textures[currentVideoID].draw(0, 0, videos[currentVideoID].getWidth(), videos[currentVideoID].getHeight());
     }
@@ -527,6 +550,7 @@ void ofxThreadedVideo::draw(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setAnchorPercent(float xPct, float yPct){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].setAnchorPoint(xPct, yPct);
     }
@@ -534,6 +558,7 @@ void ofxThreadedVideo::setAnchorPercent(float xPct, float yPct){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setAnchorPoint(float x, float y){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].setAnchorPoint(x, y);
     }
@@ -541,6 +566,7 @@ void ofxThreadedVideo::setAnchorPoint(float x, float y){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::resetAnchor(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].resetAnchor();
     }
@@ -548,6 +574,7 @@ void ofxThreadedVideo::resetAnchor(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPaused(bool b){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         bPaused[currentVideoID] = b;
     }
@@ -556,6 +583,7 @@ void ofxThreadedVideo::setPaused(bool b){
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getCurrentFrame(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getCurrentFrame();
     }else{
@@ -565,6 +593,7 @@ int ofxThreadedVideo::getCurrentFrame(){
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getTotalNumFrames(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getTotalNumFrames();
     }else{
@@ -589,6 +618,7 @@ void ofxThreadedVideo::previousFrame(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getWidth(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getWidth();
     }else{
@@ -598,6 +628,7 @@ float ofxThreadedVideo::getWidth(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getHeight(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getHeight();
     }else{
@@ -607,6 +638,7 @@ float ofxThreadedVideo::getHeight(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isPaused(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].isPaused();
         //return bPaused;
@@ -617,6 +649,7 @@ bool ofxThreadedVideo::isPaused(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoaded(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         return videos[currentVideoID].isLoaded();
         //return bPaused;
@@ -627,6 +660,7 @@ bool ofxThreadedVideo::isLoaded(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isPlaying(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].isPlaying();
         //return bPaused;
@@ -637,6 +671,7 @@ bool ofxThreadedVideo::isPlaying(){
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getName(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return names[currentVideoID];
     }else{
@@ -646,6 +681,7 @@ string ofxThreadedVideo::getName(){
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getPath(){
+    Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return paths[currentVideoID];
     }else{
@@ -655,6 +691,7 @@ string ofxThreadedVideo::getPath(){
 
 //--------------------------------------------------------------
 double ofxThreadedVideo::getFrameRate(){
+    Poco::ScopedLock<ofMutex> lock();
     return frameRate;
 }
 
