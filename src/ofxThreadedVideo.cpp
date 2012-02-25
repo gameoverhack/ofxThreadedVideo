@@ -32,7 +32,6 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bUseTexture = true;
     volume[0] = volume[1] = 255;
     newSpeed[0] = newSpeed[1] = 1.0f;
-    //newLoopState[0] = newLoopState[1] = OF_LOOP_NORMAL;
     
     bUseAutoPlay = true;
     bUseQueue = false;
@@ -162,7 +161,6 @@ void ofxThreadedVideo::update(){
                     newPosition[lastVideoID] = -1.0f;
                     newFrame[lastVideoID] = -1;
                     newSpeed[lastVideoID] = 1.0f;
-                    //newLoopState[lastVideoID] = OF_LOOP_NORMAL;
                     
                     bFrameNew[lastVideoID] = false;
                     bPaused[lastVideoID] = false;
@@ -229,18 +227,17 @@ void ofxThreadedVideo::updateVideo(int videoID){
 
     if(videoID != VIDEO_NONE){
 
+        // set speed
         if(newSpeed[videoID] != videos[videoID].getSpeed()){
             videos[videoID].setSpeed(newSpeed[videoID]);
         }
-        
-        //if(newLoopState[videoID] != videos[videoID].getLoopState()){
-        //    videos[videoID].setLoopState(newLoopState[videoID]);
-        //}
 
+        // do pause, or...
         if (bPaused[videoID] && !videos[videoID].isPaused()){
             videos[videoID].setPaused(true);
         }
 
+        // ...do unpause
         if (!bPaused[videoID] && videos[videoID].isPaused()){
             videos[videoID].setPaused(false);
         }

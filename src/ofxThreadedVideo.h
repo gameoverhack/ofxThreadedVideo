@@ -135,7 +135,6 @@ private:
     int volume[2];
     bool bPaused[2];
     float newSpeed[2];
-    ofLoopType newLoopState[2];
 
     bool bUseAutoPlay;
     bool bUseQueue;
