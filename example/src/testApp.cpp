@@ -40,24 +40,36 @@ void testApp::threadedVideoEvent(ofxThreadedVideoEvent & event){
 
 //--------------------------------------------------------------
 void testApp::keyPressed(int key){
+
     switch (key) {
-        case '1':
+        case '<':
+        case ',':
             video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
             break;
-        case '2':
+        case '>':
+        case '.':
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
             break;
-        case '3':
+        case '?':
+        case '/':
             video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
             break;
-        case '4':
-            video1.setPaused(true);
+        case 'p':
+            video1.setPaused(!video1.isPaused());
             break;
-        case '5':
-            video1.setFrame(0);
-            video1.setPaused(false);
-            break; 
+        case OF_KEY_LEFT:
+            video1.firstFrame();
+            break;
+        case OF_KEY_RIGHT:
+            video1.setFrame(video1.getTotalNumFrames());
+            break;
+        case OF_KEY_UP:
+            video1.setSpeed(video1.getSpeed() + 0.2);
+            break;
+        case OF_KEY_DOWN:
+            video1.setSpeed(video1.getSpeed() - 0.2);
+            break;
         default:
             break;
     }
