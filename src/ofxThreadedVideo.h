@@ -124,7 +124,7 @@ private:
     void updateVideo(int videoID);
 
     int getNextLoadID();
-    
+
     int loadVideoID;
     int currentVideoID;
 
@@ -135,11 +135,13 @@ private:
     int volume[2];
     bool bPaused[2];
     float newSpeed[2];
+    int newLoopType[2];
+    int frame[2];
 
     bool bUseAutoPlay;
     bool bUseQueue;
     bool bUseTexture;
-    
+
     queue<string> pathsToLoad;
     string paths[2];
     string names[2];

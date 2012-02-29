@@ -32,7 +32,9 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bUseTexture = true;
     volume[0] = volume[1] = 255;
     newSpeed[0] = newSpeed[1] = 1.0f;
-    
+    newLoopType[0] = newLoopType[1] = -1;
+    frame[0] = frame[1] = 0;
+
     bUseAutoPlay = true;
     bUseQueue = false;
 
@@ -141,10 +143,10 @@ void ofxThreadedVideo::update(){
                 ofLogVerbose() << "Allocating texture" << loadVideoID << w << h;
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
-            
+
             // check for a new frame before loading video
             if(bFrameNew[loadVideoID]){
-                
+
                 // switch the current movie ID to the one we just loaded
                 int lastVideoID = currentVideoID;
                 currentVideoID = loadVideoID;
@@ -156,12 +158,14 @@ void ofxThreadedVideo::update(){
                     ofLogVerbose() << "Closing last video" << lastVideoID;
                     paths[lastVideoID] = names[lastVideoID] = "";
                     videos[lastVideoID].stop();
-                    
+
                     // reset properties to defaults
                     newPosition[lastVideoID] = -1.0f;
                     newFrame[lastVideoID] = -1;
                     newSpeed[lastVideoID] = 1.0f;
-                    
+                    newLoopType[lastVideoID] = -1;
+                    frame[lastVideoID] = 0;
+
                     bFrameNew[lastVideoID] = false;
                     bPaused[lastVideoID] = false;
                     volume[lastVideoID] = 255;
@@ -175,7 +179,7 @@ void ofxThreadedVideo::update(){
 
         // check for a new frame for current video
         updateTexture(currentVideoID);
-        
+
         // if there's a movie in the queue
         if(pathsToLoad.size() > 0 && loadPath == "" && loadVideoID == VIDEO_NONE){
             // ...let's start trying to load it!
@@ -204,6 +208,7 @@ void ofxThreadedVideo::updatePixels(int videoID){
     videos[videoID].update();
     if (videos[videoID].isFrameNew()){
         bFrameNew[videoID] = true;
+        frame[videoID] = videos[videoID].getCurrentFrame();
     }
 }
 
@@ -218,7 +223,6 @@ void ofxThreadedVideo::updateTexture(int videoID){
                 textures[videoID].loadData(pixels[videoID]->getPixels(), w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
         }
-
         bFrameNew[videoID] = false;
     }
 }
@@ -226,6 +230,12 @@ void ofxThreadedVideo::updateTexture(int videoID){
 void ofxThreadedVideo::updateVideo(int videoID){
 
     if(videoID != VIDEO_NONE){
+
+        // set loop type
+        if(newLoopType[videoID] != -1){
+            videos[videoID].setLoopState((ofLoopType)newLoopType[videoID]);
+            newLoopType[videoID] = -1;
+        }
 
         // set speed
         if(newSpeed[videoID] != videos[videoID].getSpeed()){
@@ -285,7 +295,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                 // using a static mutex blocks all threads (including the main app) until we've loaded
                 ofxThreadedVideoMutex.lock();
-                
+
                 // load that movie!
                 if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
 
@@ -456,9 +466,9 @@ int ofxThreadedVideo::getVolume(){
 void ofxThreadedVideo::setLoopState(ofLoopType state){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        videos[currentVideoID].setLoopState(state);
+        newLoopType[currentVideoID] = state;
     }
-    videos[getNextLoadID()].setLoopState(state);
+    newLoopType[loadVideoID] = state;
 }
 
 //--------------------------------------------------------------
@@ -492,9 +502,9 @@ void ofxThreadedVideo::setFrame(int frame){
 //--------------------------------------------------------------
 void ofxThreadedVideo::setUseTexture(bool b){
     Poco::ScopedLock<ofMutex> lock();
-    // this is for ofxThreadedVideo since the ofVideoPlayers 
+    // this is for ofxThreadedVideo since the ofVideoPlayers
     // intances don't use textures internally
-    bUseTexture = b; 
+    bUseTexture = b;
 }
 
 //--------------------------------------------------------------
@@ -585,7 +595,7 @@ void ofxThreadedVideo::setPaused(bool b){
 int ofxThreadedVideo::getCurrentFrame(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getCurrentFrame();
+        return frame[currentVideoID];
     }else{
         return 0;
     }
