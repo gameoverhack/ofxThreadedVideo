@@ -289,8 +289,11 @@ void ofxThreadedVideo::threadedFunction(){
 
                 paths[loadVideoID] = loadPath;
                 loadPath = "";
-
+#ifdef TARGET_OSX
                 vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
+#else
+                vector<string> pathParts = ofSplitString(paths[loadVideoID], "\\");
+#endif
                 names[loadVideoID] = pathParts[pathParts.size() - 1];
 
                 // using a static mutex blocks all threads (including the main app) until we've loaded
