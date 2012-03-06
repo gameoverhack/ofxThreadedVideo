@@ -233,6 +233,7 @@ void ofxThreadedVideo::updateVideo(int videoID){
 
         // set loop type
         if(newLoopType[videoID] != -1){
+            cout << "set loop type" << endl;
             videos[videoID].setLoopState((ofLoopType)newLoopType[videoID]);
             newLoopType[videoID] = -1;
         }
@@ -471,7 +472,7 @@ void ofxThreadedVideo::setLoopState(ofLoopType state){
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         newLoopType[currentVideoID] = state;
     }
-    newLoopType[loadVideoID] = state;
+    newLoopType[getNextLoadID()] = state;
 }
 
 //--------------------------------------------------------------
