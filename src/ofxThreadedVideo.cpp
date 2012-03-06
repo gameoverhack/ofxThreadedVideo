@@ -403,7 +403,7 @@ float ofxThreadedVideo::getPosition(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getPosition();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -413,7 +413,7 @@ float ofxThreadedVideo::getSpeed(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getSpeed();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -423,7 +423,7 @@ float ofxThreadedVideo::getDuration(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getDuration();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -433,7 +433,7 @@ bool ofxThreadedVideo::getIsMovieDone(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getIsMovieDone();
     }else{
-        return NULL;
+        return false;
     }
 }
 
