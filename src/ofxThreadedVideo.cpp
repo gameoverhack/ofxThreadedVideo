@@ -119,6 +119,7 @@ void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
 void ofxThreadedVideo::closeMovie(){
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].closeMovie();
+        currentVideoID = VIDEO_NONE;
     }
 }
 
