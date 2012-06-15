@@ -66,6 +66,8 @@ public:
     void setPosition(float pct);
     void setVolume(int volume);
     int getVolume();
+    void setBalance(float balance);
+    float getBalance();
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
@@ -133,6 +135,7 @@ private:
     float newPosition[2];
     int newFrame[2];
     int volume[2];
+    float balance[2];
     bool bPaused[2];
     float newSpeed[2];
     int newLoopType[2];
