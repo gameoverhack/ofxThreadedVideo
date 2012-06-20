@@ -31,6 +31,7 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bPaused[0] = bPaused[1] = false;
     bUseTexture = true;
     volume[0] = volume[1] = 255;
+    balance[0] = balance[1] = .0f;
     newSpeed[0] = newSpeed[1] = 1.0f;
     newLoopType[0] = newLoopType[1] = -1;
     frame[0] = frame[1] = 0;
@@ -171,6 +172,7 @@ void ofxThreadedVideo::update(){
                     bFrameNew[lastVideoID] = false;
                     bPaused[lastVideoID] = false;
                     volume[lastVideoID] = 255;
+                    balance[lastVideoID] = .0f;
                 }
 
                 // send event notification
@@ -463,6 +465,25 @@ int ofxThreadedVideo::getVolume(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
+    }
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setBalance(float _balance){
+    Poco::ScopedLock<ofMutex> lock();
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        balance[currentVideoID] = _balance;
+        videos[currentVideoID].setBalance(balance[currentVideoID]);
+    }
+    balance[getNextLoadID()] = _balance;
+    videos[getNextLoadID()].setBalance(balance[getNextLoadID()]);
+}
+
+//--------------------------------------------------------------
+float ofxThreadedVideo::getBalance(){
+    Poco::ScopedLock<ofMutex> lock();
+    if(currentVideoID != VIDEO_NONE){
+        return balance[currentVideoID];
     }
 }
 
