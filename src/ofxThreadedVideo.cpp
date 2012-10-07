@@ -103,9 +103,8 @@ bool ofxThreadedVideo::loadMovie(string fileName){
     }
 
     // put the movie path in a queue
-    pathsToLoad.push(ofToDataPath(fileName));
+    pathsToLoad.push(fileName);
     return true;
-
 }
 
 //--------------------------------------------------------------
@@ -288,8 +287,12 @@ void ofxThreadedVideo::threadedFunction(){
 
                 loadVideoID = getNextLoadID();
 
+                if (loadPath.find("http://") == string::npos && loadPath.find("https://") == string::npos)
+                    loadPath = ofToDataPath(loadPath);
+                                                
                 paths[loadVideoID] = loadPath;
                 loadPath = "";
+                
 #ifdef TARGET_OSX
                 vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
 #else
