@@ -287,7 +287,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                 loadVideoID = getNextLoadID();
 
-                if (loadPath.find("http://") == string::npos)
+                if (loadPath.find("http://") == string::npos && loadPath.find("https://") == string::npos)
                     loadPath = ofToDataPath(loadPath);
                                                 
                 paths[loadVideoID] = loadPath;
