@@ -2,15 +2,15 @@
 
 //--------------------------------------------------------------
 void testApp::setup(){
-    
+
     ofSetLogLevel(OF_LOG_VERBOSE);
-    
+
     files.allowExt("mov");
-    files.listDir("/Users/gameover/Desktop/vjMedia/trains01/"); // put a video path here with several video files in a folder
-    
+    files.listDir("D:/vJMedia/trains01/train1"); // put a video path here with several video files in a folder
+
     video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
     video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
-    
+
     ofAddListener(video1.threadedVideoEvent, this, &testApp::threadedVideoEvent);
     ofAddListener(video2.threadedVideoEvent, this, &testApp::threadedVideoEvent);
 }
@@ -26,7 +26,7 @@ void testApp::draw(){
     ofSetColor(255, 255, 255);
     video1.draw(0, 0, video1.getWidth(), video1.getHeight());
     video2.draw(video1.getWidth(), 0, video2.getWidth(), video2.getHeight());
-    
+
     ofSetColor(0, 255, 0);
     int duration1 = video1.getDuration();
     int duration2 = video2.getDuration();
@@ -111,6 +111,6 @@ void testApp::gotMessage(ofMessage msg){
 }
 
 //--------------------------------------------------------------
-void testApp::dragEvent(ofDragInfo dragInfo){ 
+void testApp::dragEvent(ofDragInfo dragInfo){
 
 }

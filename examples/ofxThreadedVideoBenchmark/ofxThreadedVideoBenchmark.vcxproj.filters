@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+		<ClCompile Include="src\testApp.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="src\main.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="src\main.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="src\testApp.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxThreadedVideo\src\ofxThreadedVideo.cpp">
+			<Filter>addons\ofxThreadedVideo\src</Filter>
+		</ClCompile>
+	</ItemGroup>
+	<ItemGroup>
+		<Filter Include="src">
+			<UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons">
+			<UniqueIdentifier>{71834f65-f3a9-211e-73b8-dc8563776aec}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo">
+			<UniqueIdentifier>{1b7a5e75-103e-4af0-d7c9-f6e9e1d74e8e}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo\src">
+			<UniqueIdentifier>{d0eaa3b8-cf3b-9888-1083-bedb7c48607e}</UniqueIdentifier>
+		</Filter>
+	</ItemGroup>
+	<ItemGroup>
+		<ClInclude Include="src\testApp.h">
+			<Filter>src</Filter>
+		</ClInclude>
+		<ClInclude Include="src\testApp.h">
+			<Filter>src</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxThreadedVideo\src\ofxThreadedVideo.h">
+			<Filter>addons\ofxThreadedVideo\src</Filter>
+		</ClInclude>
+	</ItemGroup>
+</Project>

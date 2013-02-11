@@ -132,10 +132,12 @@ void ofxThreadedVideo::close(){
 void ofxThreadedVideo::update(){
 
     if(lock()){
-
+        
         // check if we're loading a video
         if(loadVideoID != VIDEO_NONE){
-
+            
+            videos[loadVideoID].update();
+            
             float w = videos[loadVideoID].getWidth();
             float h = videos[loadVideoID].getHeight();
 
@@ -206,7 +208,6 @@ void ofxThreadedVideo::update(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::updatePixels(int videoID){
-    videos[videoID].update();
     if (videos[videoID].isFrameNew()){
         bFrameNew[videoID] = true;
         frame[videoID] = videos[videoID].getCurrentFrame();
@@ -403,7 +404,7 @@ float ofxThreadedVideo::getPosition(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getPosition();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -413,7 +414,7 @@ float ofxThreadedVideo::getSpeed(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getSpeed();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -423,7 +424,7 @@ float ofxThreadedVideo::getDuration(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getDuration();
     }else{
-        return NULL;
+        return 0;
     }
 }
 
@@ -433,7 +434,7 @@ bool ofxThreadedVideo::getIsMovieDone(){
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].getIsMovieDone();
     }else{
-        return NULL;
+        return false;
     }
 }
 
@@ -472,7 +473,7 @@ void ofxThreadedVideo::setLoopState(ofLoopType state){
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         newLoopType[currentVideoID] = state;
     }
-    newLoopType[loadVideoID] = state;
+    newLoopType[getNextLoadID()] = state;
 }
 
 //--------------------------------------------------------------
