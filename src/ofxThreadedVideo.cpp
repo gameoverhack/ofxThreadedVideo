@@ -216,6 +216,7 @@ void ofxThreadedVideo::updatePixels(int videoID){
 //--------------------------------------------------------------
 void ofxThreadedVideo::updateTexture(int videoID){
     if(videoID != VIDEO_NONE){
+        videos[videoID].update();
         if(bUseTexture){
             // make sure we don't have NULL pixels
             if(pixels[videoID]->getPixels() != NULL && textures[videoID].isAllocated()){
