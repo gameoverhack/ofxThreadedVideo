@@ -132,12 +132,12 @@ void ofxThreadedVideo::close(){
 void ofxThreadedVideo::update(){
 
     if(lock()){
-        
+
         // check if we're loading a video
         if(loadVideoID != VIDEO_NONE){
-            
+
             videos[loadVideoID].update();
-            
+
             float w = videos[loadVideoID].getWidth();
             float h = videos[loadVideoID].getHeight();
 
@@ -148,7 +148,7 @@ void ofxThreadedVideo::update(){
             }
 
             // check for a new frame before loading video
-            if(bFrameNew[loadVideoID]){
+            if(bFrameNew[loadVideoID] && videos[loadVideoID].getCurrentFrame() > 0){
 
                 // switch the current movie ID to the one we just loaded
                 int lastVideoID = currentVideoID;
