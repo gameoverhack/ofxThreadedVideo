@@ -136,7 +136,7 @@ void ofxThreadedVideo::update(){
         // check if we're loading a video
         if(loadVideoID != VIDEO_NONE){
 
-            videos[loadVideoID].update();
+            updatePixels(loadVideoID);
 
             float w = videos[loadVideoID].getWidth();
             float h = videos[loadVideoID].getHeight();
@@ -208,6 +208,7 @@ void ofxThreadedVideo::update(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::updatePixels(int videoID){
+    videos[videoID].update();
     if (videos[videoID].isFrameNew()){
         bFrameNew[videoID] = true;
         frame[videoID] = videos[videoID].getCurrentFrame();
@@ -217,7 +218,7 @@ void ofxThreadedVideo::updatePixels(int videoID){
 //--------------------------------------------------------------
 void ofxThreadedVideo::updateTexture(int videoID){
     if(videoID != VIDEO_NONE){
-        videos[videoID].update();
+        updatePixels(videoID);
         if(bUseTexture){
             // make sure we don't have NULL pixels
             if(pixels[videoID]->getPixels() != NULL && textures[videoID].isAllocated()){
@@ -266,9 +267,6 @@ void ofxThreadedVideo::updateVideo(int videoID){
             CLAMP(newFrame[videoID], 0, videos[videoID].getTotalNumFrames());
             videos[videoID].setFrame(newFrame[videoID]);
         }
-
-        // update current video
-        updatePixels(videoID);
 
         // unpause if doing a non blocking seek to position
         if(newPosition[videoID] != -1.0f && !bPaused[videoID]) videos[videoID].setPaused(false);
