@@ -48,6 +48,7 @@ public:
 
     bool loadMovie(string name);
     void setPixelFormat(ofPixelFormat pixelFormat);
+    ofPixelFormat getPixelFormat();
     void closeMovie();
     void close();
 
@@ -98,6 +99,7 @@ public:
     bool isPaused();
     bool isLoaded();
     bool isPlaying();
+    bool isLoading();
 
     //float width, height;
 

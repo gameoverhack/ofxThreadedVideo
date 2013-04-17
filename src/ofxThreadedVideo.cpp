@@ -116,6 +116,11 @@ void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
 }
 
 //--------------------------------------------------------------
+ofPixelFormat ofxThreadedVideo::getPixelFormat(){
+    return internalPixelFormat;
+}
+
+//--------------------------------------------------------------
 void ofxThreadedVideo::closeMovie(){
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].closeMovie();
@@ -365,6 +370,19 @@ void ofxThreadedVideo::play(){
 void ofxThreadedVideo::stop(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
+        videos[currentVideoID].stop();
+        paths[currentVideoID] = names[currentVideoID] = "";
+        
+        // reset properties to defaults
+        newPosition[currentVideoID] = -1.0f;
+        newFrame[currentVideoID] = -1;
+        newSpeed[currentVideoID] = 1.0f;
+        newLoopType[currentVideoID] = -1;
+        frame[currentVideoID] = 0;
+        
+        bFrameNew[currentVideoID] = false;
+        bPaused[currentVideoID] = false;
+        volume[currentVideoID] = 255;
         videos[currentVideoID].stop();
     }
 }
@@ -655,9 +673,18 @@ bool ofxThreadedVideo::isPaused(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].isPaused();
-        //return bPaused;
     }else{
         return false;
+    }
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::isLoading(){
+    Poco::ScopedLock<ofMutex> lock();
+    if(loadVideoID == VIDEO_NONE){
+        return false;
+    }else{
+        return true;
     }
 }
 
@@ -666,7 +693,6 @@ bool ofxThreadedVideo::isLoaded(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         return videos[currentVideoID].isLoaded();
-        //return bPaused;
     }else{
         return false;
     }
@@ -677,7 +703,6 @@ bool ofxThreadedVideo::isPlaying(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return videos[currentVideoID].isPlaying();
-        //return bPaused;
     }else{
         return false;
     }
@@ -697,6 +722,8 @@ string ofxThreadedVideo::getName(){
 string ofxThreadedVideo::getPath(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
+        return paths[currentVideoID];
+    }else if(loadVideoID != VIDEO_NONE){
         return paths[currentVideoID];
     }else{
         return "";
