@@ -617,7 +617,7 @@ void ofxThreadedVideo::setPaused(bool b){
 int ofxThreadedVideo::getCurrentFrame(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
-        return frame[currentVideoID];
+        return CLAMP(frame[currentVideoID], 0.0f, getTotalNumFrames());
     }else{
         return 0;
     }
