@@ -65,8 +65,10 @@ public:
     bool getIsMovieDone();
 
     void setPosition(float pct);
-    void setVolume(int volume);
-    int getVolume();
+    void setVolume(float volume);
+    float getVolume();
+    void setPan(float pan);
+    float getPan();
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
@@ -134,7 +136,8 @@ private:
 
     float newPosition[2];
     int newFrame[2];
-    int volume[2];
+    float volume[2];
+    float pan[2];
     bool bPaused[2];
     float newSpeed[2];
     int newLoopType[2];

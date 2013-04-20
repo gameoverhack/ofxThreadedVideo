@@ -30,7 +30,8 @@ ofxThreadedVideo::ofxThreadedVideo(){
     newFrame[0] = newFrame[1] = -1;
     bPaused[0] = bPaused[1] = false;
     bUseTexture = true;
-    volume[0] = volume[1] = 255;
+    volume[0] = volume[1] = 1.0f;
+    pan[0] = pan[1] = 0.0f;
     newSpeed[0] = newSpeed[1] = 1.0f;
     newLoopType[0] = newLoopType[1] = -1;
     frame[0] = frame[1] = 0;
@@ -176,7 +177,8 @@ void ofxThreadedVideo::update(){
 
                     bFrameNew[lastVideoID] = false;
                     bPaused[lastVideoID] = false;
-                    volume[lastVideoID] = 255;
+                    volume[lastVideoID] = 1.0f;
+                    pan[lastVideoID] = 0.0f;
                 }
 
                 // send event notification
@@ -372,17 +374,18 @@ void ofxThreadedVideo::stop(){
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].stop();
         paths[currentVideoID] = names[currentVideoID] = "";
-        
+
         // reset properties to defaults
         newPosition[currentVideoID] = -1.0f;
         newFrame[currentVideoID] = -1;
         newSpeed[currentVideoID] = 1.0f;
         newLoopType[currentVideoID] = -1;
         frame[currentVideoID] = 0;
-        
+
         bFrameNew[currentVideoID] = false;
         bPaused[currentVideoID] = false;
-        volume[currentVideoID] = 255;
+        volume[currentVideoID] = 1.0f;
+        pan[currentVideoID] = 0.0f;
         videos[currentVideoID].stop();
     }
 }
@@ -466,7 +469,7 @@ void ofxThreadedVideo::setPosition(float pct){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setVolume(int _volume){
+void ofxThreadedVideo::setVolume(float _volume){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
         volume[currentVideoID] = _volume;
@@ -477,10 +480,29 @@ void ofxThreadedVideo::setVolume(int _volume){
 }
 
 //--------------------------------------------------------------
-int ofxThreadedVideo::getVolume(){
+float ofxThreadedVideo::getVolume(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
+    }
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setPan(float _pan){
+    Poco::ScopedLock<ofMutex> lock();
+    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
+        pan[currentVideoID] = _pan;
+        videos[currentVideoID].setPan(pan[currentVideoID]);
+    }
+    pan[getNextLoadID()] = _pan;
+    videos[getNextLoadID()].setPan(pan[getNextLoadID()]);
+}
+
+//--------------------------------------------------------------
+float ofxThreadedVideo::getPan(){
+    Poco::ScopedLock<ofMutex> lock();
+    if(currentVideoID != VIDEO_NONE){
+        return pan[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
 }
 
