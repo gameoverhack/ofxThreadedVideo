@@ -11,7 +11,7 @@
 #define _H_OFXTHREADEDVIDEO
 
 #include <set>
-#include <queue>
+#include <deque>
 
 #include "ofLog.h"
 #include "ofConstants.h"
@@ -100,11 +100,12 @@ public:
     bool isLoaded();
     bool isPlaying();
     bool isLoading();
-
+    bool isQueued(string path);
+    
     //float width, height;
 
-    string getName();
-    string getPath();
+    string getMovieName();
+    string getMoviePath();
 
     double getFrameRate();
 
@@ -144,7 +145,7 @@ private:
     bool bUseQueue;
     bool bUseTexture;
 
-    queue<string> pathsToLoad;
+    deque<string> pathsToLoad;
     string paths[2];
     string names[2];
     bool bFrameNew[2];

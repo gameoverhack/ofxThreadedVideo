@@ -103,7 +103,7 @@ bool ofxThreadedVideo::loadMovie(string fileName){
     }
 
     // put the movie path in a queue
-    pathsToLoad.push(ofToDataPath(fileName));
+    pathsToLoad.push_back(ofToDataPath(fileName));
     return true;
 
 }
@@ -153,7 +153,7 @@ void ofxThreadedVideo::update(){
             }
 
             // check for a new frame before loading video
-            if(bFrameNew[loadVideoID] && videos[loadVideoID].getCurrentFrame() > 0){
+            if(((bFrameNew[loadVideoID] && bUseAutoPlay && videos[loadVideoID].getCurrentFrame() > 0) || (!bUseAutoPlay && videos[loadVideoID].getCurrentFrame() == 0))){
 
                 // switch the current movie ID to the one we just loaded
                 int lastVideoID = currentVideoID;
@@ -192,7 +192,7 @@ void ofxThreadedVideo::update(){
         if(pathsToLoad.size() > 0 && loadPath == "" && loadVideoID == VIDEO_NONE){
             // ...let's start trying to load it!
             loadPath = pathsToLoad.front();
-            pathsToLoad.pop();
+            pathsToLoad.pop_front();
         };
 
         // calculate frameRate -> taken from ofAppRunner
@@ -370,7 +370,8 @@ void ofxThreadedVideo::play(){
 void ofxThreadedVideo::stop(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].stop();
+        videos[0].stop();
+        videos[1].stop();
         paths[currentVideoID] = names[currentVideoID] = "";
         
         // reset properties to defaults
@@ -383,7 +384,8 @@ void ofxThreadedVideo::stop(){
         bFrameNew[currentVideoID] = false;
         bPaused[currentVideoID] = false;
         volume[currentVideoID] = 255;
-        videos[currentVideoID].stop();
+        currentVideoID = VIDEO_NONE;
+        loadVideoID = VIDEO_NONE;
     }
 }
 
@@ -391,7 +393,7 @@ void ofxThreadedVideo::stop(){
 bool ofxThreadedVideo::isFrameNew(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
-        return bFrameNew[currentVideoID];
+        return videos[currentVideoID].isFrameNew();//bFrameNew[currentVideoID];
     }else{
         return false;
     }
@@ -709,7 +711,7 @@ bool ofxThreadedVideo::isPlaying(){
 }
 
 //--------------------------------------------------------------
-string ofxThreadedVideo::getName(){
+string ofxThreadedVideo::getMovieName(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return names[currentVideoID];
@@ -719,15 +721,29 @@ string ofxThreadedVideo::getName(){
 }
 
 //--------------------------------------------------------------
-string ofxThreadedVideo::getPath(){
+string ofxThreadedVideo::getMoviePath(){
     Poco::ScopedLock<ofMutex> lock();
     if(currentVideoID != VIDEO_NONE){
         return paths[currentVideoID];
     }else if(loadVideoID != VIDEO_NONE){
-        return paths[currentVideoID];
+        return paths[loadVideoID];
     }else{
         return "";
     }
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::isQueued(string path){
+    Poco::ScopedLock<ofMutex> lock();
+    for(int i = 0; i < pathsToLoad.size(); i++){
+        if(pathsToLoad[i] == path) return true;
+    }
+    if(loadVideoID != VIDEO_NONE){
+        return (path == paths[currentVideoID]);
+    }else{
+        return false;
+    }
+    
 }
 
 //--------------------------------------------------------------
