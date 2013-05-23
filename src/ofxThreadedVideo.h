@@ -143,6 +143,7 @@ private:
     float newSpeed[2];
     int newLoopType[2];
     int frame[2];
+    int totalframes[2];
 
     bool bUseAutoPlay;
     bool bUseQueue;
