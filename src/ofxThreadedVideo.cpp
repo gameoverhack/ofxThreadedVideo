@@ -124,15 +124,15 @@ ofPixelFormat ofxThreadedVideo::getPixelFormat(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::closeMovie(){
-    //Poco::ScopedLock<ofMutex> lock(mutex);
-    while (!lock()) {
-        ofLogVerbose() << "Waiting for lock";
-    }
+    Poco::ScopedLock<ofMutex> lock(mutex);
+//    while (!lock()) {
+//        ofLogVerbose() << "Waiting for lock";
+//    }
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].closeMovie();
         currentVideoID = VIDEO_NONE;
     }
-    unlock();
+//    unlock();
 }
 
 //--------------------------------------------------------------
@@ -370,22 +370,22 @@ int ofxThreadedVideo::getNextLoadID(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::play(){
-    //Poco::ScopedLock<ofMutex> lock(mutex);
-    while (!lock()) {
-        ofLogVerbose() << "Waiting for lock";
-    }
+    Poco::ScopedLock<ofMutex> lock(mutex);
+//    while (!lock()) {
+//        ofLogVerbose() << "Waiting for lock";
+//    }
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].play();
     }
-    unlock();
+//    unlock();
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::stop(){
-    //Poco::ScopedLock<ofMutex> lock(mutex);
-    while (!lock()) {
-        ofLogVerbose() << "Waiting for lock";
-    }
+    Poco::ScopedLock<ofMutex> lock(mutex);
+//    while (!lock()) {
+//        ofLogVerbose() << "Waiting for lock";
+//    }
     if(currentVideoID != VIDEO_NONE){
         
         ofLogVerbose() << "Stopping " << names[currentVideoID] << " " << currentVideoID;
@@ -410,7 +410,7 @@ void ofxThreadedVideo::stop(){
         currentVideoID = VIDEO_NONE;
         loadVideoID = VIDEO_NONE;
     }
-    unlock();
+//    unlock();
 }
 
 //--------------------------------------------------------------
