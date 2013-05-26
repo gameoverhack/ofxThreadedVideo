@@ -124,11 +124,15 @@ ofPixelFormat ofxThreadedVideo::getPixelFormat(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::closeMovie(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
+    //Poco::ScopedLock<ofMutex> lock(mutex);
+    while (!lock()) {
+        ofLogVerbose() << "Waiting for lock";
+    }
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].closeMovie();
         currentVideoID = VIDEO_NONE;
     }
+    unlock();
 }
 
 //--------------------------------------------------------------
@@ -151,7 +155,7 @@ void ofxThreadedVideo::update(){
             
             // allocate a texture if the one we have is a different size
             if(bUseTexture && (textures[loadVideoID].getWidth() != w || textures[loadVideoID].getHeight() != h)){
-                ofLogVerbose() << "Allocating texture" << loadVideoID << w << h;
+                ofLogVerbose() << "Allocating texture " << loadVideoID << w << h;
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
 
@@ -167,7 +171,7 @@ void ofxThreadedVideo::update(){
                 // close the last movie - we do this here because
                 // ofQuicktimeVideo chokes if you try to close in a thread
                 if(lastVideoID != VIDEO_NONE){
-                    ofLogVerbose() << "Closing last video" << lastVideoID;
+                    ofLogVerbose() << "Closing last video " << lastVideoID;
                     paths[lastVideoID] = names[lastVideoID] = "";
                     videos[lastVideoID].stop();
 
@@ -344,7 +348,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
 
             // sleep a bit so we don't thrash the cores!!
-            ofSleepMillis(1000/30); // TODO: implement target frame rate? US might need 30 here?
+            ofSleepMillis(1000/25); // TODO: implement target frame rate? US might need 30 here?
 
         }
     }
@@ -366,16 +370,22 @@ int ofxThreadedVideo::getNextLoadID(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::play(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
+    //Poco::ScopedLock<ofMutex> lock(mutex);
+    while (!lock()) {
+        ofLogVerbose() << "Waiting for lock";
+    }
     if(currentVideoID != VIDEO_NONE){
         videos[currentVideoID].play();
     }
+    unlock();
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::stop(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    
+    //Poco::ScopedLock<ofMutex> lock(mutex);
+    while (!lock()) {
+        ofLogVerbose() << "Waiting for lock";
+    }
     if(currentVideoID != VIDEO_NONE){
         
         ofLogVerbose() << "Stopping " << names[currentVideoID] << " " << currentVideoID;
@@ -399,8 +409,8 @@ void ofxThreadedVideo::stop(){
         videos[currentVideoID].update();
         currentVideoID = VIDEO_NONE;
         loadVideoID = VIDEO_NONE;
-
     }
+    unlock();
 }
 
 //--------------------------------------------------------------
