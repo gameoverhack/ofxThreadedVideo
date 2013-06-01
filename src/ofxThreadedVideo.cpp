@@ -18,10 +18,11 @@ ofxThreadedVideo::ofxThreadedVideo(){
     videos[0].setUseTexture(false);
     videos[1].setUseTexture(false);
     setPixelFormat(OF_PIXELS_RGB);
-    bFrameNew[0] = bFrameNew[1] = false;
-    paths[0] = paths[1] = names[0] = names[1] = "";
 
     // set vars to default values
+    bFrameNew[0] = bFrameNew[1] = false;
+    paths[0] = paths[1] = names[0] = names[1] = "";
+    
     loadVideoID = VIDEO_NONE;
     currentVideoID = VIDEO_NONE;
     loadPath = "";
@@ -391,24 +392,28 @@ void ofxThreadedVideo::stop(){
         ofLogVerbose() << "Stopping " << names[currentVideoID] << " " << currentVideoID;
         
         videos[0].stop();
+        //videos[0].update();
         videos[1].stop();
-        paths[currentVideoID] = names[currentVideoID] = "";
-
+        //videos[1].update();
+        
         // reset properties to defaults
-        newPosition[currentVideoID] = -1.0f;
-        newFrame[currentVideoID] = -1;
-        newSpeed[currentVideoID] = 1.0f;
-        newLoopType[currentVideoID] = -1;
-        frame[currentVideoID] = 0;
-        bFrameNew[currentVideoID] = false;
-        bPaused[currentVideoID] = false;
-        volume[currentVideoID] = 1.0f;
-        pan[currentVideoID] = 0.0f;
-        totalframes[currentVideoID] = 0;
-        videos[currentVideoID].stop();
-        videos[currentVideoID].update();
-        currentVideoID = VIDEO_NONE;
+        bFrameNew[0] = bFrameNew[1] = false;
+        paths[0] = paths[1] = names[0] = names[1] = "";
+        
         loadVideoID = VIDEO_NONE;
+        currentVideoID = VIDEO_NONE;
+        loadPath = "";
+        
+        newPosition[0] = newPosition[1] = -1.0f;
+        newFrame[0] = newFrame[1] = -1;
+        bPaused[0] = bPaused[1] = false;
+        bUseTexture = true;
+        volume[0] = volume[1] = 1.0f;
+        pan[0] = pan[1] = 0.0f;
+        newSpeed[0] = newSpeed[1] = 1.0f;
+        newLoopType[0] = newLoopType[1] = -1;
+        frame[0] = frame[1] = 0;
+        totalframes[0] = totalframes[1] = 0;
     }
 //    unlock();
 }
@@ -726,10 +731,10 @@ bool ofxThreadedVideo::isPaused(){
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoading(){
     Poco::ScopedLock<ofMutex> lock(mutex);
-    if(loadVideoID == VIDEO_NONE){
-        return false;
-    }else{
+    if(loadVideoID != VIDEO_NONE || pathsToLoad.size() > 0){
         return true;
+    }else{
+        return false;
     }
 }
 
@@ -770,6 +775,10 @@ string ofxThreadedVideo::getMoviePath(){
         return paths[currentVideoID];
     }else if(loadVideoID != VIDEO_NONE){
         return paths[loadVideoID];
+    }else if(loadPath != ""){
+        return loadPath;
+    }else if(pathsToLoad.size() > 0){
+        return pathsToLoad[0];
     }else{
         return "";
     }

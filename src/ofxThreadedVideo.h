@@ -179,6 +179,13 @@ public:
     ofxThreadedVideoEventType eventType;
     ofxThreadedVideo * video;
 
+    friend ostream& operator<< (ostream &os, ofxThreadedVideoEvent &e);
+    
+};
+
+inline ostream& operator<<(ostream& os, const ofxThreadedVideoEvent &e){
+    os << e.eventTypeAsString << " " << e.path;
+    return os;
 };
 
 #endif
