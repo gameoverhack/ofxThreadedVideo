@@ -22,6 +22,9 @@
 #include "ofVideoPlayer.h"
 #include "ofAppRunner.h"
 
+#define USE_QUICKTIME_7
+#define USE_JACK_AUDIO
+
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
     VIDEO_EVENT_LOAD_FAIL,
@@ -36,8 +39,13 @@ public:
 
     ofxThreadedVideo();
     ~ofxThreadedVideo();
-
-    void setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer);
+    
+    template <typename T>
+    void setPlayer(){
+        videos[0].setPlayer(ofPtr<T>(new T));
+        videos[1].setPlayer(ofPtr<T>(new T));
+    }
+//    void setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer);
     ofPtr<ofBaseVideoPlayer> getPlayer();
 
     void setUseAutoPlay(bool b);
@@ -67,8 +75,10 @@ public:
     void setPosition(float pct);
     void setVolume(float volume);
     float getVolume();
+#ifdef USE_QUICKTIME_7
     void setPan(float pan);
     float getPan();
+#endif
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
@@ -106,6 +116,14 @@ public:
     
     //float width, height;
 
+#ifdef USE_JACK_AUDIO
+    vector<string>  getAudioDevices();
+    int             getAudioTrackList();
+    void            setAudioDevice(int ID);
+    void            setAudioDevice(string deviceName);
+    bool            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel);
+#endif
+    
     string getMovieName();
     string getMoviePath();
 
@@ -113,7 +131,7 @@ public:
 
     ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
     string getEventTypeAsString(ofxThreadedVideoEventType eventType);
-
+    
 protected:
 
     void threadedFunction();
@@ -158,7 +176,9 @@ private:
     ofVideoPlayer videos[2];
 
     ofPixelFormat internalPixelFormat;
-
+    string audioDeviceIDString;
+    int audioDeviceIDInt;
+    
     double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
 
     // block copy ctor and assignment operator

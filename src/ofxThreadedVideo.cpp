@@ -14,11 +14,13 @@ static ofMutex ofxThreadedVideoMutex;
 //--------------------------------------------------------------
 ofxThreadedVideo::ofxThreadedVideo(){
 
+    setPlayer<ofQuickTimePlayer>();
+    
     // setup video instances
     videos[0].setUseTexture(false);
     videos[1].setUseTexture(false);
     setPixelFormat(OF_PIXELS_RGB);
-
+    
     // set vars to default values
     bFrameNew[0] = bFrameNew[1] = false;
     paths[0] = paths[1] = names[0] = names[1] = "";
@@ -40,7 +42,9 @@ ofxThreadedVideo::ofxThreadedVideo(){
 
     bUseAutoPlay = true;
     bUseQueue = false;
-
+    audioDeviceIDInt = -1;
+    audioDeviceIDString = "";
+    
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
 
@@ -58,12 +62,6 @@ ofxThreadedVideo::~ofxThreadedVideo(){
     videos[0].close();
     videos[1].close();
 
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer){
-    videos[0].setPlayer(newPlayer);
-    videos[1].setPlayer(newPlayer);
 }
 
 //--------------------------------------------------------------
@@ -321,6 +319,10 @@ void ofxThreadedVideo::threadedFunction(){
 
                     ofLogVerbose() << "Loaded " << names[loadVideoID] << " " << loadVideoID;
 
+                    // setAudioDevice TODO: is this possible to set while playing??
+                    if(audioDeviceIDInt != -1) videos[loadVideoID].setAudioDevice(audioDeviceIDInt);
+                    if(audioDeviceIDString != "") videos[loadVideoID].setAudioDevice(audioDeviceIDString);
+                    
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
@@ -514,7 +516,7 @@ float ofxThreadedVideo::getVolume(){
         return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
 }
-
+#ifdef USE_QUICKTIME_7
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPan(float _pan){
     Poco::ScopedLock<ofMutex> lock(mutex);
@@ -533,7 +535,7 @@ float ofxThreadedVideo::getPan(){
         return pan[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
     }
 }
-
+#endif
 //--------------------------------------------------------------
 void ofxThreadedVideo::setLoopState(ofLoopType state){
     Poco::ScopedLock<ofMutex> lock(mutex);
@@ -803,6 +805,41 @@ double ofxThreadedVideo::getFrameRate(){
     Poco::ScopedLock<ofMutex> lock(mutex);
     return frameRate;
 }
+
+#ifdef USE_JACK_AUDIO
+//--------------------------------------------------------------
+vector<string> ofxThreadedVideo::getAudioDevices(){
+    return videos[0].getAudioDevices();
+}
+
+//--------------------------------------------------------------
+int ofxThreadedVideo::getAudioTrackList(){
+    return videos[0].getAudioTrackList();
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setAudioDevice(int ID){
+    audioDeviceIDInt = ID;
+//    videos[0].setAudioDevice(ID);
+//    videos[1].setAudioDevice(ID);
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setAudioDevice(string deviceName){
+    audioDeviceIDString = deviceName;
+//    videos[0].setAudioDevice(deviceName);
+//    videos[1].setAudioDevice(deviceName);
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel){
+    if(currentVideoID != VIDEO_NONE){
+        return videos[currentVideoID].setAudioTrackToChannel(trackIndex, oldChannelLabel, newChannelLabel);
+    }else{
+        return false;
+    }
+}
+#endif
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventType){
