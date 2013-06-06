@@ -32,6 +32,14 @@ enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_THREADBLOCKED
 };
 
+#ifdef USE_JACK_AUDIO
+struct AudioChannelMap{
+    int trackIndex;
+    int oldChannel;
+    int newChannel;
+};
+#endif
+
 class ofxThreadedVideoEvent;
 class ofxThreadedVideo : public ofThread {
 
@@ -121,7 +129,7 @@ public:
     int             getAudioTrackList();
     void            setAudioDevice(int ID);
     void            setAudioDevice(string deviceName);
-    bool            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel);
+    void            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel, bool bResetChannels);
 #endif
     
     string getMovieName();
@@ -174,7 +182,11 @@ private:
     ofPixels * pixels[2];
     ofTexture textures[2];
     ofVideoPlayer videos[2];
-
+    
+#ifdef USE_JACK_AUDIO
+    vector<AudioChannelMap> audioChannelMap;
+#endif
+    
     ofPixelFormat internalPixelFormat;
     string audioDeviceIDString;
     int audioDeviceIDInt;

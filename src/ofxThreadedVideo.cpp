@@ -47,7 +47,11 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
-
+    
+#ifdef USE_JACK_AUDIO
+    audioChannelMap.clear();
+#endif
+    
     // let's go!
     startThread(false, false);
 }
@@ -318,10 +322,17 @@ void ofxThreadedVideo::threadedFunction(){
                 if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
 
                     ofLogVerbose() << "Loaded " << names[loadVideoID] << " " << loadVideoID;
-
+                    
+#ifdef USE_JACK_AUDIO
+                    for(int channel = 0; channel < audioChannelMap.size(); channel++){
+                        ofLogVerbose() << "Remap audio channel for track: " << audioChannelMap[channel].trackIndex << " " << audioChannelMap[channel].oldChannel << " " << audioChannelMap[channel].newChannel;
+                        videos[loadVideoID].setAudioTrackToChannel(audioChannelMap[channel].trackIndex, audioChannelMap[channel].oldChannel, audioChannelMap[channel].newChannel);
+                    }
+                    
                     // setAudioDevice TODO: is this possible to set while playing??
                     if(audioDeviceIDInt != -1) videos[loadVideoID].setAudioDevice(audioDeviceIDInt);
                     if(audioDeviceIDString != "") videos[loadVideoID].setAudioDevice(audioDeviceIDString);
+#endif
                     
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
@@ -347,7 +358,7 @@ void ofxThreadedVideo::threadedFunction(){
             // do threaded update of videos
             updateVideo(currentVideoID);
             updateVideo(loadVideoID);
-
+            
             unlock();
 
             // sleep a bit so we don't thrash the cores!!
@@ -416,6 +427,11 @@ void ofxThreadedVideo::stop(){
         newLoopType[0] = newLoopType[1] = -1;
         frame[0] = frame[1] = 0;
         totalframes[0] = totalframes[1] = 0;
+        
+#ifdef USE_JACK_AUDIO
+        audioChannelMap.clear();
+#endif
+        
     }
 //    unlock();
 }
@@ -832,12 +848,13 @@ void ofxThreadedVideo::setAudioDevice(string deviceName){
 }
 
 //--------------------------------------------------------------
-bool ofxThreadedVideo::setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel){
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].setAudioTrackToChannel(trackIndex, oldChannelLabel, newChannelLabel);
-    }else{
-        return false;
-    }
+void ofxThreadedVideo::setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel, bool bResetChannels){
+    if(bResetChannels) audioChannelMap.clear();
+    AudioChannelMap m;
+    m.trackIndex = trackIndex;
+    m.oldChannel = oldChannelLabel;
+    m.newChannel = newChannelLabel;
+    audioChannelMap.push_back(m);
 }
 #endif
 
