@@ -174,7 +174,7 @@ private:
     bool bUseAutoPlay;
     bool bUseQueue;
     bool bUseTexture;
-
+    
     deque<string> pathsToLoad;
     string paths[2];
     string names[2];
@@ -185,11 +185,12 @@ private:
     
 #ifdef USE_JACK_AUDIO
     vector<AudioChannelMap> audioChannelMap;
+    bool bUpdateAudioDevices;
+    string audioDeviceIDString;
+    int audioDeviceIDInt;
 #endif
     
     ofPixelFormat internalPixelFormat;
-    string audioDeviceIDString;
-    int audioDeviceIDInt;
     
     double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
 
