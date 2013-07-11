@@ -324,6 +324,8 @@ void ofxThreadedVideo::threadedFunction(){
 
                     ofLogVerbose() << "Loaded " << names[loadVideoID] << " " << loadVideoID;
                     
+
+                    
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
@@ -340,27 +342,29 @@ void ofxThreadedVideo::threadedFunction(){
                     ofNotifyEvent(threadedVideoEvent, videoEvent, this);
                 }
 
-
                 ofxThreadedVideoMutex.unlock();
-
+                
+            }
+            
 #ifdef USE_JACK_AUDIO
+            if(bUpdateAudioDevices && loadVideoID != VIDEO_NONE){
+                ofLogVerbose() << "Setting audio device and channel maps";
                 for(int channel = 0; channel < audioChannelMap.size(); channel++){
                     ofLogVerbose() << "Remap audio channel for track: " << audioChannelMap[channel].trackIndex << " " << audioChannelMap[channel].oldChannel << " " << audioChannelMap[channel].newChannel;
                     videos[loadVideoID].setAudioTrackToChannel(audioChannelMap[channel].trackIndex, audioChannelMap[channel].oldChannel, audioChannelMap[channel].newChannel);
                 }
-                if(bUpdateAudioDevices && loadVideoID != VIDEO_NONE){
-                    // setAudioDevice TODO: is this possible to set while playing??
-                    if(audioDeviceIDInt != -1) videos[loadVideoID].setAudioDevice(audioDeviceIDInt);
-                    if(audioDeviceIDString != "") videos[loadVideoID].setAudioDevice(audioDeviceIDString);
-                    bUpdateAudioDevices = false;
-                }
-#endif
-                
+                // setAudioDevice TODO: is this possible to set while playing??
+                if(audioDeviceIDInt != -1) videos[loadVideoID].setAudioDevice(audioDeviceIDInt);
+                if(audioDeviceIDString != "") videos[loadVideoID].setAudioDevice(audioDeviceIDString);
+                bUpdateAudioDevices = false;
             }
-
+#endif
+            
             // do threaded update of videos
             updateVideo(currentVideoID);
             updateVideo(loadVideoID);
+            
+
             
             unlock();
 
@@ -433,8 +437,8 @@ void ofxThreadedVideo::stop(){
         
 #ifdef USE_JACK_AUDIO
         audioChannelMap.clear();
-        audioDeviceIDInt = -1;
-        audioDeviceIDString = "";
+//        audioDeviceIDInt = -1;
+//        audioDeviceIDString = "";
         bUpdateAudioDevices = false;
 #endif
         
