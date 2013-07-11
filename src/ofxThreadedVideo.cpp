@@ -522,7 +522,7 @@ void ofxThreadedVideo::setVolume(float _volume){
         videos[currentVideoID].setVolume(volume[currentVideoID]);
     }
     volume[getNextLoadID()] = _volume;
-    videos[getNextLoadID()].setVolume(volume[getNextLoadID()]);
+//    videos[getNextLoadID()].setVolume(volume[getNextLoadID()]);
 }
 
 //--------------------------------------------------------------
