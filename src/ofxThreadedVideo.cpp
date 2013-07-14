@@ -46,6 +46,15 @@ ofxThreadedVideo::ofxThreadedVideo(){
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
     
+    bUseFixedTextureSize = false;
+    
+    fixedWidth = 1920.0f;
+    fixedHeight = 1080.0f;
+    
+    // maybe should not do this here?
+    textures[0].allocate(fixedWidth, fixedHeight, ofGetGLTypeFromPixelFormat(internalPixelFormat));
+    textures[1].allocate(fixedWidth, fixedHeight, ofGetGLTypeFromPixelFormat(internalPixelFormat));
+    
 #ifdef USE_JACK_AUDIO
     audioChannelMap.clear();
     audioDeviceIDInt = -1;
@@ -154,12 +163,20 @@ void ofxThreadedVideo::update(){
 
             updatePixels(loadVideoID);
 
-            float w = videos[loadVideoID].getWidth();
-            float h = videos[loadVideoID].getHeight();
+            float w = 0;
+            float h = 0;
+            
+            if(bUseFixedTextureSize){
+                w = fixedWidth;
+                h = fixedHeight;
+            }else{
+                w = videos[loadVideoID].getWidth();
+                h = videos[loadVideoID].getHeight();
+            }
             
             // allocate a texture if the one we have is a different size
             if(bUseTexture && (textures[loadVideoID].getWidth() != w || textures[loadVideoID].getHeight() != h)){
-                ofLogVerbose() << "Allocating texture " << loadVideoID << w << h;
+                ofLogVerbose() << "Allocating texture: " << loadVideoID << w << " x " << h;
                 textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
             }
 
@@ -612,6 +629,36 @@ ofTexture & ofxThreadedVideo::getTextureReference(){
         //ofLogVerbose() << "No video loaded. Returning garbage";
         return textures[0];
     }
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setFixedTextureSize(float w, float h){
+    Poco::ScopedLock<ofMutex> lock(mutex);
+    // Fixed width and height needs to be => the video width and height.
+    fixedWidth = w;
+    fixedHeight = h;
+    if(!bUseFixedTextureSize){
+        ofLogWarning() << "Make sure to call setUseFixedTextureSize(true) for this to work!" << endl;
+    }
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setUseFixedTextureSize(bool b){
+    Poco::ScopedLock<ofMutex> lock(mutex);
+    // Fixed texture sizes forces all videos to upload to the same sized texture - this needs
+    // to be => the video width and height. Use setFixedTextureSize to change width and height.
+    bUseFixedTextureSize = b;
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::getUseFixedTextureSize(){
+    Poco::ScopedLock<ofMutex> lock(mutex);
+    return bUseFixedTextureSize;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::toggleUseFixedTextureSize(){
+    bUseFixedTextureSize = !bUseFixedTextureSize;
 }
 
 //--------------------------------------------------------------

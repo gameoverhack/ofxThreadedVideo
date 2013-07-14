@@ -94,6 +94,12 @@ public:
 
     void setUseTexture(bool bUse);
     ofTexture &	getTextureReference();
+    
+    void setFixedTextureSize(float w, float h);
+    void setUseFixedTextureSize(bool b);
+    bool getUseFixedTextureSize();
+    void toggleUseFixedTextureSize();
+    
     void draw(float x, float y, float w, float h);
     void draw(float x, float y);
     void draw(const ofPoint & p);
@@ -170,10 +176,12 @@ private:
     int newLoopType[2];
     int frame[2];
     int totalframes[2];
+    float fixedWidth, fixedHeight;
 
     bool bUseAutoPlay;
     bool bUseQueue;
     bool bUseTexture;
+    bool bUseFixedTextureSize;
     
     deque<string> pathsToLoad;
     string paths[2];
