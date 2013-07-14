@@ -324,8 +324,6 @@ void ofxThreadedVideo::threadedFunction(){
 
                     ofLogVerbose() << "Loaded " << names[loadVideoID] << " " << loadVideoID;
                     
-
-                    
                     // start rolling if AutoPlay is true
                     if (bUseAutoPlay) videos[loadVideoID].play();
 
@@ -363,8 +361,6 @@ void ofxThreadedVideo::threadedFunction(){
             // do threaded update of videos
             updateVideo(currentVideoID);
             updateVideo(loadVideoID);
-            
-
             
             unlock();
 
