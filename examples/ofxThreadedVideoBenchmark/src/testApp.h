@@ -3,7 +3,7 @@
 #include "ofMain.h"
 #include "ofxThreadedVideo.h"
 
-#define MAX_VIDEOS 16
+#define MAX_VIDEOS 8
 
 class testApp : public ofBaseApp{
 

@@ -44,8 +44,8 @@
 #include "ofVideoPlayer.h"
 #include "ofAppRunner.h"
 
-#define USE_QUICKTIME_7
-#define USE_JACK_AUDIO
+//#define USE_QUICKTIME_7
+//#define USE_JACK_AUDIO
 
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
