@@ -1,69 +1,103 @@
 /*
- *  ofxThreadedVideo.cpp
- *  emptyExample
+ * ofxThreadedVideo.cpp
  *
- *  Created by gameover on 2/02/12.
- *  Copyright 2012 trace media. All rights reserved.
+ * Copyright 2010-2013 (c) Matthew Gingold http://gingold.com.au
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * If you're using this software for something cool consider sending
+ * me an email to let me know about your project: m@gingold.com.au
  *
  */
 
 #include "ofxThreadedVideo.h"
 
-static ofMutex ofxThreadedVideoMutex;
+int ofxThreadedVideo::getQueueSize(){
+//        ofScopedLock lock(ofxThreadedVideoGlobalMutex);
+    return ofxThreadedVideoCommands.size();
+}
+int ofxThreadedVideo::getLoadOk(){
+    return ofxThreadedVideoLoadOk;
+}
+
+int ofxThreadedVideo::getLoadFail(){
+    return ofxThreadedVideoLoadFail;
+}
 
 //--------------------------------------------------------------
 ofxThreadedVideo::ofxThreadedVideo(){
 
+    instanceID = ofxThreadedVideoGlobalInstanceID;
+    ofxThreadedVideoGlobalInstanceID++;
+    
+    initializeQuicktime();
+    
     setPlayer<ofQuickTimePlayer>();
     
     // setup video instances
-    videos[0].setUseTexture(false);
-    videos[1].setUseTexture(false);
+    video[0].setUseTexture(false);
+    video[1].setUseTexture(false);
     setPixelFormat(OF_PIXELS_RGB);
     
     // set vars to default values
-    bFrameNew[0] = bFrameNew[1] = false;
-    paths[0] = paths[1] = names[0] = names[1] = "";
+    currentVideoID = VIDEO_FLIP;
+    bCriticalSection = false;
+    bLoaded = false;
     
-    loadVideoID = VIDEO_NONE;
-    currentVideoID = VIDEO_NONE;
-    loadPath = "";
-
-    newPosition[0] = newPosition[1] = -1.0f;
-    newFrame[0] = newFrame[1] = -1;
-    bPaused[0] = bPaused[1] = false;
     bUseTexture = true;
-    volume[0] = volume[1] = 1.0f;
-    pan[0] = pan[1] = 0.0f;
-    newSpeed[0] = newSpeed[1] = 1.0f;
-    newLoopType[0] = newLoopType[1] = -1;
-    frame[0] = frame[1] = 0;
-    totalframes[0] = totalframes[1] = 0;
-
-    bUseAutoPlay = true;
-    bUseQueue = false;
+    bIsFrameNew = false;
+    bIsPlaying = false;
+    bIsLoading = false;
+    bIsMovieDone = false;
+    
+    width = 0.0f;
+    height = 0.0f;
+    
+    speed = 0.0f;
+    position = 0.0f;
+    duration = 0.0f;
+    
+    volume = 0.0f;
+    pan = 0.0f;
+    
+    loopState = OF_LOOP_NORMAL;
+    
+    frameCurrent = 0;
+    frameTotal = 0;
+    
+    movieName = "";
+    moviePath = "";
+    
+    pixels = &video[currentVideoID].getPixelsRef();
     
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
     
-    bUseFixedTextureSize = false;
+    ofxThreadedVideoNullCommand.setCommand("NULL_COMMAND", -1);
     
-    fixedWidth = 1920.0f;
-    fixedHeight = 1080.0f;
-    
-    // maybe should not do this here?
-    textures[0].allocate(fixedWidth, fixedHeight, ofGetGLTypeFromPixelFormat(internalPixelFormat));
-    textures[1].allocate(fixedWidth, fixedHeight, ofGetGLTypeFromPixelFormat(internalPixelFormat));
-    
-#ifdef USE_JACK_AUDIO
-    audioChannelMap.clear();
-    audioDeviceIDInt = -1;
-    audioDeviceIDString = "";
-    bUpdateAudioDevices = false;
-#endif
+    bVerbose = false;
     
     // let's go!
-    startThread(false, false);
+    startThread();
 }
 
 //--------------------------------------------------------------
@@ -71,244 +105,106 @@ ofxThreadedVideo::~ofxThreadedVideo(){
 
     // stop threading
     waitForThread(true);
-
+    
     // close anything left open
-    videos[0].close();
-    videos[1].close();
+    video[0].close();
+    video[1].close();
+    
+    drawTexture.clear();
 
-}
-
-//--------------------------------------------------------------
-ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
-    return videos[0].getPlayer();
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setUseAutoPlay(bool b){
-    bUseAutoPlay = b;
-}
-
-//--------------------------------------------------------------
-bool ofxThreadedVideo::getUseAutoPlay(){
-    return bUseAutoPlay;
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setUseQueue(bool b){
-    bUseQueue = b;
-}
-
-//--------------------------------------------------------------
-bool ofxThreadedVideo::getUseQueue(){
-    return bUseQueue;
-}
-
-//--------------------------------------------------------------
-bool ofxThreadedVideo::loadMovie(string fileName){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    // check if we're using a queue or only allowing one file to load at a time
-    if (!bUseQueue && pathsToLoad.size() > 0){
-        ofLogWarning() << "Ignoring loadMovie(" << fileName << ") as we're not using a queue and a movie is already loading. Returning false. You can change this behaviour with setUseQueue(true)";
-
-        // send event notification
-        ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(loadPath, VIDEO_EVENT_LOAD_BLOCKED, this);
-        ofNotifyEvent(threadedVideoEvent, videoEvent, this);
-
-        return false;
-    }
-
-    // put the movie path in a queue
-    pathsToLoad.push_back(ofToDataPath(fileName));
-    return true;
-
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
-    internalPixelFormat = _pixelFormat;
-    videos[0].setPixelFormat(internalPixelFormat);
-    videos[1].setPixelFormat(internalPixelFormat);
-}
-
-//--------------------------------------------------------------
-ofPixelFormat ofxThreadedVideo::getPixelFormat(){
-    return internalPixelFormat;
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::closeMovie(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-//    while (!lock()) {
-//        ofLogVerbose() << "Waiting for lock";
-//    }
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].closeMovie();
-        currentVideoID = VIDEO_NONE;
-    }
-//    unlock();
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::close(){
-    closeMovie();
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::update(){
-
-    if(lock()){
-
-        // check if we're loading a video
-        if(loadVideoID != VIDEO_NONE){
-
-            updatePixels(loadVideoID);
-
-            float w = 0;
-            float h = 0;
+    
+    lock();
+    
+    if(!bCriticalSection && bLoaded){
+        bCriticalSection = true;
+        int videoID = currentVideoID;
+        bool bUpdate = bLoaded;
+        unlock();
+        
+        if(bUpdate){
             
-            if(bUseFixedTextureSize){
-                w = fixedWidth;
-                h = fixedHeight;
-            }else{
-                w = videos[loadVideoID].getWidth();
-                h = videos[loadVideoID].getHeight();
-            }
+//            lock();
+            video[videoID].update();
             
-            // allocate a texture if the one we have is a different size
-            if(bUseTexture && (textures[loadVideoID].getWidth() != w || textures[loadVideoID].getHeight() != h)){
-                ofLogVerbose() << "Allocating texture: " << loadVideoID << w << " x " << h;
-                textures[loadVideoID].allocate(w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
-            }
-
-            // check for a new frame before loading video
-            if(((bFrameNew[loadVideoID] && bUseAutoPlay && videos[loadVideoID].getCurrentFrame() > 0) || (!bUseAutoPlay && videos[loadVideoID].getCurrentFrame() == 0))){
-
-                // switch the current movie ID to the one we just loaded
-                int lastVideoID = currentVideoID;
-                currentVideoID = loadVideoID;
-                loadVideoID = VIDEO_NONE;
-                totalframes[currentVideoID] = videos[currentVideoID].getTotalNumFrames();
+            bIsFrameNew = video[videoID].isFrameNew();
+            position = video[videoID].getPosition();
+            frameCurrent = video[videoID].getCurrentFrame();
+            bIsMovieDone = video[videoID].getIsMovieDone();
+//            unlock();
+            
+            if(bIsFrameNew){
                 
-                // close the last movie - we do this here because
-                // ofQuicktimeVideo chokes if you try to close in a thread
-                if(lastVideoID != VIDEO_NONE){
-                    ofLogVerbose() << "Closing last video " << lastVideoID;
-                    paths[lastVideoID] = names[lastVideoID] = "";
-                    videos[lastVideoID].stop();
-
-                    // reset properties to defaults
-                    newPosition[lastVideoID] = -1.0f;
-                    newFrame[lastVideoID] = -1;
-                    newSpeed[lastVideoID] = 1.0f;
-                    newLoopType[lastVideoID] = -1;
-                    frame[lastVideoID] = 0;
-                    totalframes[lastVideoID] = 0;
-                    
-                    bFrameNew[lastVideoID] = false;
-                    bPaused[lastVideoID] = false;
-                    volume[lastVideoID] = 1.0f;
-                    pan[lastVideoID] = 0.0f;
+                if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
+                    drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
                 }
-
-                // send event notification
-                ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[currentVideoID], VIDEO_EVENT_LOAD_OK, this);
-                ofNotifyEvent(threadedVideoEvent, videoEvent, this);
+                unsigned char * pixels = video[videoID].getPixels();
+                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+                
+                // calculate frameRate -> taken from ofAppRunner
+                prevMillis = ofGetElapsedTimeMillis();
+                timeNow = ofGetElapsedTimef();
+                double diff = timeNow-timeThen;
+                if( diff  > 0.00001 ){
+                    fps			= 1.0 / diff;
+                    frameRate	*= 0.9f;
+                    frameRate	+= 0.1f*fps;
+                }
+                lastFrameTime	= diff;
+                timeThen		= timeNow;
+                
             }
         }
-
-        // check for a new frame for current video
-        updateTexture(currentVideoID);
-
-        // if there's a movie in the queue
-        if(pathsToLoad.size() > 0 && loadPath == "" && loadVideoID == VIDEO_NONE){
-            // ...let's start trying to load it!
-            loadPath = pathsToLoad.front();
-            pathsToLoad.pop_front();
-        };
-
-        // calculate frameRate -> taken from ofAppRunner
-        prevMillis = ofGetElapsedTimeMillis();
-        timeNow = ofGetElapsedTimef();
-        double diff = timeNow-timeThen;
-        if( diff  > 0.00001 ){
-            fps			= 1.0 / diff;
-            frameRate	*= 0.9f;
-            frameRate	+= 0.1f*fps;
-        }
-        lastFrameTime	= diff;
-        timeThen		= timeNow;
-
+        
+        lock();
+        bCriticalSection = false;
+        unlock();
+    }else{
         unlock();
     }
-}
+    
+    lock();
+    ofxThreadedVideoGlobalMutex.lock();
+    if(!ofxThreadedVideoGlobalCritical && !bCriticalSection){
+        int videoID = currentVideoID;
+        ofxThreadedVideoGlobalCritical = true;
+        bCriticalSection = true;
+        ofxThreadedVideoCommand c = getCommand();
+        bool bCanStop = bLoaded;
+        bool bPopCommand = false;
+        unlock();
+        ofxThreadedVideoGlobalMutex.unlock();
 
-//--------------------------------------------------------------
-void ofxThreadedVideo::updatePixels(int videoID){
-    videos[videoID].update();
-    if (videos[videoID].isFrameNew()){
-        bFrameNew[videoID] = true;
-        frame[videoID] = videos[videoID].getCurrentFrame();
-    }
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::updateTexture(int videoID){
-    if(videoID != VIDEO_NONE){
-        updatePixels(videoID);
-        if(bUseTexture){
-            // make sure we don't have NULL pixels
-            if(pixels[videoID]->getPixels() != NULL && textures[videoID].isAllocated()){
-                float w = videos[videoID].getWidth();
-                float h = videos[videoID].getHeight();
-                textures[videoID].loadData(pixels[videoID]->getPixels(), w, h, ofGetGLTypeFromPixelFormat(internalPixelFormat));
+        if(c.getInstance() == instanceID){
+            if(c.getCommand() == "loadMovie" && bCanStop){
+                
+                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                
+                video[videoID].stop();
+                
+                lock();
+                currentVideoID = getNextLoadID();
+                bIsPaused = false;
+                bLoaded = false;
+                bIsLoading = true;
+                bIsPlaying = false;
+                unlock();
+                
             }
         }
-        bFrameNew[videoID] = false;
-    }
-}
-
-void ofxThreadedVideo::updateVideo(int videoID){
-
-    if(videoID != VIDEO_NONE){
-
-        // set loop type
-        if(newLoopType[videoID] != -1){
-            videos[videoID].setLoopState((ofLoopType)newLoopType[videoID]);
-            newLoopType[videoID] = -1;
-        }
-
-        // set speed
-        if(newSpeed[videoID] != videos[videoID].getSpeed()){
-            videos[videoID].setSpeed(newSpeed[videoID]);
-        }
-
-        // do pause, or...
-        if (bPaused[videoID] && !videos[videoID].isPaused()){
-            videos[videoID].setPaused(true);
-        }
-
-        // ...do unpause
-        if (!bPaused[videoID] && videos[videoID].isPaused()){
-            videos[videoID].setPaused(false);
-        }
-
-        // do non blocking seek to position
-        if(newPosition[videoID] != -1.0f){
-            if(!bPaused[videoID]) videos[videoID].setPaused(true);
-            videos[videoID].setPosition(newPosition[videoID]);
-        }
-
-        // do non blocking seek to frame
-        if(newFrame[videoID] != -1){
-            CLAMP(newFrame[videoID], 0, videos[videoID].getTotalNumFrames());
-            videos[videoID].setFrame(newFrame[videoID]);
-        }
-
-        // unpause if doing a non blocking seek to position
-        if(newPosition[videoID] != -1.0f && !bPaused[videoID]) videos[videoID].setPaused(false);
-
-        newPosition[videoID] = -1.0f;
-        newFrame[videoID] = -1;
+        
+        lock();
+        ofxThreadedVideoGlobalMutex.lock();
+        ofxThreadedVideoGlobalCritical = false;
+        bCriticalSection = false;
+        ofxThreadedVideoGlobalMutex.unlock();
+        unlock();
+    }else{
+        ofxThreadedVideoGlobalMutex.unlock();
+        unlock();
     }
 }
 
@@ -317,441 +213,521 @@ void ofxThreadedVideo::threadedFunction(){
 
     while (isThreadRunning()){
 
-        if(lock()){
-
-            // if there's a movie to load...
-            if(loadPath != ""){
-
-                loadVideoID = getNextLoadID();
-
-                paths[loadVideoID] = loadPath;
-                loadPath = "";
-#ifdef TARGET_OSX
-                vector<string> pathParts = ofSplitString(paths[loadVideoID], "/");
-#else
-                vector<string> pathParts = ofSplitString(paths[loadVideoID], "\\");
-#endif
-                names[loadVideoID] = pathParts[pathParts.size() - 1];
-
-                // using a static mutex blocks all threads (including the main app) until we've loaded
-                ofxThreadedVideoMutex.lock();
-
-                // load that movie!
-                if(videos[loadVideoID].loadMovie(paths[loadVideoID])){
-
-                    ofLogVerbose() << "Loaded " << names[loadVideoID] << " " << loadVideoID;
+        lock();
+        ofxThreadedVideoGlobalMutex.lock();
+        if(!ofxThreadedVideoGlobalCritical && !bCriticalSection){
+            ofxThreadedVideoGlobalCritical = true;
+            bCriticalSection = true;
+            int videoID = currentVideoID;
+            ofxThreadedVideoCommand c = getCommand();
+            bool bCanLoad = !bLoaded;
+            bool bPopCommand = false;
+            unlock();
+            ofxThreadedVideoGlobalMutex.unlock();
+            
+            if(c.getInstance() == instanceID){
+                
+                if(c.getCommand() == "play"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].play();
                     
-                    // start rolling if AutoPlay is true
-                    if (bUseAutoPlay) videos[loadVideoID].play();
-
-                    // set pixel refs
-                    pixels[loadVideoID] = &videos[loadVideoID].getPixelsRef();
-
-                }else{
-
-                    ofLogVerbose() << "Could not load video";
-                    loadVideoID = VIDEO_NONE;
-
-                    // send event notification
-                    ofxThreadedVideoEvent videoEvent = ofxThreadedVideoEvent(paths[loadVideoID], VIDEO_EVENT_LOAD_FAIL, this);
-                    ofNotifyEvent(threadedVideoEvent, videoEvent, this);
+                    lock();
+                    bIsPlaying = true;
+                    bIsPaused = false;
+                    unlock();
+                    
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "stop"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].stop();
+                    
+                    lock();
+                    bIsPlaying = false;
+                    bIsPaused = false; // ????
+                    bIsLoading = false;
+                    bIsFrameNew = false;
+                    bIsMovieDone = false;
+                    bLoaded = false;
+                    unlock();
+                    
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setPosition"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    position = c.getArgument<float>(0);
+                    unlock();
+                    video[videoID].setPosition(position);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setVolume"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    volume = c.getArgument<float>(0);
+                    unlock();
+                    video[videoID].setPan(volume);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setPan"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    pan = c.getArgument<float>(0);
+                    unlock();
+                    video[videoID].setPan(pan);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setLoopState"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    loopState = (ofLoopType)c.getArgument<int>(0);
+                    unlock();
+                    video[videoID].setLoopState(loopState);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setSpeed"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    speed = c.getArgument<float>(0);
+                    unlock();
+                    video[videoID].setSpeed(speed);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setFrame"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    int frameTarget = c.getArgument<int>(0);
+                    CLAMP(frameTarget, 0, frameTotal);
+                    video[videoID].setFrame(frameTarget);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setPaused"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    lock();
+                    bIsPaused = c.getArgument<bool>(0);
+                    unlock();
+                    video[videoID].setPaused(bIsPaused);
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setAnchorPercent"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].setAnchorPercent(c.getArgument<float>(0), c.getArgument<float>(0));
+                    bPopCommand = true;
                 }
 
-                ofxThreadedVideoMutex.unlock();
+                if(c.getCommand() == "setAnchorPoint"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].setAnchorPercent(c.getArgument<float>(0), c.getArgument<float>(0));
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "resetAnchor"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].resetAnchor();
+                    bPopCommand = true;
+                }
+                
+#ifdef USE_JACK_AUDIO
+                if(c.getCommand() == "setAudioTrackToChannel"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].setAudioTrackToChannel(c.getArgument<int>(0), c.getArgument<int>(1), c.getArgument<int>(2));
+                    bPopCommand = true;
+                }
+                
+                if(c.getCommand() == "setAudioDevice"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    video[videoID].setAudioDevice(c.getArgument<string>(0));
+                    bPopCommand = true;
+                }
+#endif
+                
+                if(c.getCommand() == "loadMovie" && bCanLoad){
+                    if(bVerbose) ofLogVerbose() << instanceID << " - " << c.getCommandAsString();
+                    if(video[videoID].loadMovie(c.getArgument<string>(0))){
+                        if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                        
+//                        lock();
+                        
+                        width = video[videoID].getWidth();
+                        height = video[videoID].getHeight();
+                        speed = video[videoID].getSpeed();
+                        duration = video[videoID].getDuration();
+                        position = video[videoID].getPosition();
+                        frameCurrent = video[videoID].getCurrentFrame();
+                        frameTotal = video[videoID].getTotalNumFrames();
+                        volume = video[videoID].getVolume();
+                        pan = video[videoID].getPan();
+                        loopState = video[videoID].getLoopState();
+                        
+                        moviePath = c.getArgument<string>(0);
+#ifdef TARGET_OSX
+                        vector<string> pathParts = ofSplitString(moviePath, "/");
+#else
+                        vector<string> pathParts = ofSplitString(moviePath, "\\");
+#endif
+                        movieName = pathParts[pathParts.size() - 1];
+                        
+                        bIsPaused = true;
+                        bIsPlaying = false;
+                        bIsLoading = false;
+                        bLoaded = true;
+                        
+                        pixels = &video[videoID].getPixelsRef();
+//
+                        unlock();
+                        
+                        bPopCommand = true;
+                        
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_OK, this);
+                        ofNotifyEvent(threadedVideoEvent, e, this);
+                        
+                        ofxThreadedVideoLoadOk++;
+                    }else{
+                        
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_FAIL, this);
+                        ofNotifyEvent(threadedVideoEvent, e, this);
+                        
+                        ofxThreadedVideoLoadFail++;
+                    }
+                    
+                }
                 
             }
             
-#ifdef USE_JACK_AUDIO
-            if(bUpdateAudioDevices && loadVideoID != VIDEO_NONE){
-                ofLogVerbose() << "Setting audio device and channel maps";
-                for(int channel = 0; channel < audioChannelMap.size(); channel++){
-                    ofLogVerbose() << "Remap audio channel for track: " << audioChannelMap[channel].trackIndex << " " << audioChannelMap[channel].oldChannel << " " << audioChannelMap[channel].newChannel;
-                    videos[loadVideoID].setAudioTrackToChannel(audioChannelMap[channel].trackIndex, audioChannelMap[channel].oldChannel, audioChannelMap[channel].newChannel);
-                }
-                // setAudioDevice TODO: is this possible to set while playing??
-                if(audioDeviceIDInt != -1) videos[loadVideoID].setAudioDevice(audioDeviceIDInt);
-                if(audioDeviceIDString != "") videos[loadVideoID].setAudioDevice(audioDeviceIDString);
-                bUpdateAudioDevices = false;
+            if(bPopCommand){
+                video[videoID].update();
             }
-#endif
+        
+            lock();
+            ofxThreadedVideoGlobalMutex.lock();
             
-            // do threaded update of videos
-            updateVideo(currentVideoID);
-            updateVideo(loadVideoID);
+            if(bPopCommand){
+//                video[videoID].update();
+                popCommand();
+            }
             
+            ofxThreadedVideoGlobalCritical = false;
+            bCriticalSection = false;
+            ofxThreadedVideoGlobalMutex.unlock();
             unlock();
-
-            // sleep a bit so we don't thrash the cores!!
-            ofSleepMillis(1000/25); // TODO: implement target frame rate? US might need 30 here?
-
+        }else{
+            ofxThreadedVideoGlobalMutex.unlock();
+            unlock();
         }
+        
+        ofSleepMillis(1);
+
+    }
+        
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::pushCommand(ofxThreadedVideoCommand& c, bool back){
+    lock();
+    ofxThreadedVideoGlobalMutex.lock();
+    if(bVerbose) ofLogVerbose() << "Push command: " << c.getCommandAsString();
+    if(back){
+        ofxThreadedVideoCommands.push_back(c);
+    }else{
+        ofxThreadedVideoCommands.push_front(c);
+    }
+    ofxThreadedVideoGlobalMutex.unlock();
+    unlock();
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::popCommand(){
+    ofxThreadedVideoCommands.pop_front();
+}
+
+//--------------------------------------------------------------
+ofxThreadedVideoCommand ofxThreadedVideo::getCommand(){
+    if(ofxThreadedVideoCommands.size() > 0){
+        return ofxThreadedVideoCommands.front();
+    }else{
+        return ofxThreadedVideoNullCommand;
     }
 }
 
 //--------------------------------------------------------------
-int ofxThreadedVideo::getNextLoadID(){
-    // get the free slot in our videos array
-    switch (currentVideoID) {
-        case VIDEO_NONE:
-        case VIDEO_FLOP:
-            return VIDEO_FLIP;
-            break;
-        case VIDEO_FLIP:
-            return VIDEO_FLOP;
-            break;
-    }
+bool ofxThreadedVideo::loadMovie(string path){
+    ofxThreadedVideoCommand c("loadMovie", instanceID);
+    c.setArgument(path);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::play(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-//    while (!lock()) {
-//        ofLogVerbose() << "Waiting for lock";
-//    }
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].play();
-    }
-//    unlock();
+    ofxThreadedVideoCommand c("play", instanceID);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::stop(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-//    while (!lock()) {
-//        ofLogVerbose() << "Waiting for lock";
-//    }
-    if(currentVideoID != VIDEO_NONE){
-        
-        ofLogVerbose() << "Stopping " << names[currentVideoID] << " " << currentVideoID;
-        
-        videos[0].stop();
-        //videos[0].update();
-        videos[1].stop();
-        //videos[1].update();
-        
-        // reset properties to defaults
-        bFrameNew[0] = bFrameNew[1] = false;
-        paths[0] = paths[1] = names[0] = names[1] = "";
-        
-        loadVideoID = VIDEO_NONE;
-        currentVideoID = VIDEO_NONE;
-        loadPath = "";
-        
-        newPosition[0] = newPosition[1] = -1.0f;
-        newFrame[0] = newFrame[1] = -1;
-        bPaused[0] = bPaused[1] = false;
-        bUseTexture = true;
-        volume[0] = volume[1] = 1.0f;
-        pan[0] = pan[1] = 0.0f;
-        newSpeed[0] = newSpeed[1] = 1.0f;
-        newLoopType[0] = newLoopType[1] = -1;
-        frame[0] = frame[1] = 0;
-        totalframes[0] = totalframes[1] = 0;
-        
-#ifdef USE_JACK_AUDIO
-        audioChannelMap.clear();
-//        audioDeviceIDInt = -1;
-//        audioDeviceIDString = "";
-        bUpdateAudioDevices = false;
-#endif
-        
-    }
-//    unlock();
+    ofxThreadedVideoCommand c("stop", instanceID);
+    pushCommand(c);
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::close(){
+    closeMovie();
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::closeMovie(){
+    lock();
+    ofxThreadedVideoGlobalMutex.lock();
+    
+    video[0].close();
+    video[1].close();
+    
+    bCriticalSection = false;
+    bLoaded = false;
+    
+    bUseTexture = true;
+    bIsFrameNew = false;
+    bIsPlaying = false;
+    bIsLoading = false;
+    bIsMovieDone = false;
+    
+    width = 0.0f;
+    height = 0.0f;
+    
+    speed = 0.0f;
+    position = 0.0f;
+    duration = 0.0f;
+    
+    volume = 0.0f;
+    pan = 0.0f;
+    
+    loopState = OF_LOOP_NORMAL;
+    
+    frameCurrent = 0;
+    frameTotal = 0;
+    
+    movieName = "";
+    moviePath = "";
+    
+    prevMillis = ofGetElapsedTimeMillis();
+    lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
+    
+    ofxThreadedVideoGlobalMutex.unlock();
+    unlock();
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFrameNew(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].isFrameNew();//bFrameNew[currentVideoID];
-    }else{
-        return false;
-    }
-}
-
-//--------------------------------------------------------------
-unsigned char * ofxThreadedVideo::getPixels(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return pixels[currentVideoID]->getPixels();
-    }else{
-        return NULL;
-    }
-}
-
-//--------------------------------------------------------------
-ofPixelsRef ofxThreadedVideo::getPixelsRef(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getPixelsRef();
-    }
+    ofScopedLock lock(mutex);
+    return bIsFrameNew;
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getPosition(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getPosition();
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return position;
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getSpeed(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getSpeed();
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return speed;
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getDuration(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getDuration();
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return duration;
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::getIsMovieDone(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getIsMovieDone();
-    }else{
-        return false;
-    }
+    ofScopedLock lock(mutex);
+    return bIsMovieDone;
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setPosition(float pct){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    CLAMP(pct, 0.0f, 1.0f);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        newPosition[currentVideoID] = pct;
-    }
-    newPosition[getNextLoadID()] = pct;
+void ofxThreadedVideo::setPosition(float _pct){
+    CLAMP(_pct, 0.0f, 1.0f);
+    ofxThreadedVideoCommand c("setPosition", instanceID);
+    c.setArgument(_pct);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setVolume(float _volume){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        volume[currentVideoID] = _volume;
-        videos[currentVideoID].setVolume(volume[currentVideoID]);
-    }
-    volume[getNextLoadID()] = _volume;
-//    videos[getNextLoadID()].setVolume(volume[getNextLoadID()]);
+    CLAMP(_volume, 0.0f, 1.0f);
+    ofxThreadedVideoCommand c("setVolume", instanceID);
+    c.setArgument(_volume);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getVolume(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return volume[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
-    }
+    ofScopedLock lock(mutex);
+    return volume;
 }
+
 #ifdef USE_QUICKTIME_7
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPan(float _pan){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        pan[currentVideoID] = _pan;
-        videos[currentVideoID].setPan(pan[currentVideoID]);
-    }
-    pan[getNextLoadID()] = _pan;
-    videos[getNextLoadID()].setPan(pan[getNextLoadID()]);
+    CLAMP(_pan, -1.0f, 1.0f);
+    ofxThreadedVideoCommand c("setPan", instanceID);
+    c.setArgument(_pan);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getPan(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return pan[currentVideoID]; // videos[currentVideoID].getVolume(); this should be implemented in OF!
-    }
+    ofScopedLock lock(mutex);
+    return pan;
 }
 #endif
+
 //--------------------------------------------------------------
 void ofxThreadedVideo::setLoopState(ofLoopType state){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        newLoopType[currentVideoID] = state;
-    }
-    newLoopType[getNextLoadID()] = state;
+    ofxThreadedVideoCommand c("setLoopState", instanceID);
+    c.setArgument(state);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getLoopState(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getLoopState();
-    }else{
-        return NULL;
-    }
+    ofScopedLock lock(mutex);
+    return loopState;
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setSpeed(float speed){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        newSpeed[currentVideoID] = speed;
-    }
-    newSpeed[getNextLoadID()] = speed;
+    ofxThreadedVideoCommand c("setSpeed", instanceID);
+    c.setArgument(speed);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setFrame(int frame){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        newFrame[currentVideoID] = frame;
-    }
-    newFrame[getNextLoadID()] = frame;
+    ofxThreadedVideoCommand c("setFrame", instanceID);
+    c.setArgument(frame);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setUseTexture(bool b){
-    Poco::ScopedLock<ofMutex> lock(mutex);
+    ofScopedLock lock(mutex);
     // this is for ofxThreadedVideo since the ofVideoPlayers
     // intances don't use textures internally
     bUseTexture = b;
 }
 
 //--------------------------------------------------------------
-ofTexture & ofxThreadedVideo::getTextureReference(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return textures[currentVideoID];
-    }else{
-        //ofLogVerbose() << "No video loaded. Returning garbage";
-        return textures[0];
-    }
+ofTexture& ofxThreadedVideo::getTextureReference(){
+    return drawTexture;
+}
+
+// untested pixel operations!! be careful ;)
+
+//--------------------------------------------------------------
+unsigned char * ofxThreadedVideo::getPixels(){
+    ofScopedLock lock(mutex);
+    return pixels->getPixels();
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setFixedTextureSize(float w, float h){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    // Fixed width and height needs to be => the video width and height.
-    fixedWidth = w;
-    fixedHeight = h;
-    if(!bUseFixedTextureSize){
-        ofLogWarning() << "Make sure to call setUseFixedTextureSize(true) for this to work!" << endl;
-    }
+ofPixelsRef ofxThreadedVideo::getPixelsRef(){
+    ofScopedLock lock(mutex);
+    return *pixels;
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setUseFixedTextureSize(bool b){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    // Fixed texture sizes forces all videos to upload to the same sized texture - this needs
-    // to be => the video width and height. Use setFixedTextureSize to change width and height.
-    bUseFixedTextureSize = b;
+void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
+    ofScopedLock lock(mutex);
+    internalPixelFormat = _pixelFormat;
+    video[0].setPixelFormat(internalPixelFormat);
+    video[1].setPixelFormat(internalPixelFormat);
 }
 
 //--------------------------------------------------------------
-bool ofxThreadedVideo::getUseFixedTextureSize(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    return bUseFixedTextureSize;
+ofPixelFormat ofxThreadedVideo::getPixelFormat(){
+    ofScopedLock lock(mutex);
+    return internalPixelFormat;
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::toggleUseFixedTextureSize(){
-    bUseFixedTextureSize = !bUseFixedTextureSize;
+ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
+    return video[0].getPlayer();
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
-        textures[currentVideoID].draw(x, y, w, h);
-    }
+    drawTexture.draw(x, y, w, h);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
-        textures[currentVideoID].draw(x, y, videos[currentVideoID].getWidth(), videos[currentVideoID].getHeight());
-    }
+    draw(x, y, width, height);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(const ofPoint & p){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
-        textures[currentVideoID].draw(p);
-    }
+    draw(p.x, p.y, width, height);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(const ofRectangle & r){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
-        textures[currentVideoID].draw(r);
-    }
+    draw(r.x, r.y, r.width, r.height);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && textures[currentVideoID].isAllocated()){
-        textures[currentVideoID].draw(0, 0, videos[currentVideoID].getWidth(), videos[currentVideoID].getHeight());
-    }
+    draw(0, 0, width, height);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setAnchorPercent(float xPct, float yPct){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].setAnchorPoint(xPct, yPct);
-    }
+    ofxThreadedVideoCommand c("setAnchorPercent", instanceID);
+    c.setArgument(xPct);
+    c.setArgument(yPct);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setAnchorPoint(float x, float y){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].setAnchorPoint(x, y);
-    }
+    ofxThreadedVideoCommand c("setAnchorPoint", instanceID);
+    c.setArgument(x);
+    c.setArgument(y);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::resetAnchor(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        videos[currentVideoID].resetAnchor();
-    }
+    ofxThreadedVideoCommand c("resetAnchor", instanceID);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPaused(bool b){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        bPaused[currentVideoID] = b;
-    }
-    bPaused[getNextLoadID()] = b;
+    ofxThreadedVideoCommand c("setPaused", instanceID);
+    c.setArgument(b);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getCurrentFrame(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return CLAMP(frame[currentVideoID], 0.0f, totalframes[currentVideoID]);
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return frameCurrent;
 }
 
 //--------------------------------------------------------------
 int ofxThreadedVideo::getTotalNumFrames(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return totalframes[currentVideoID];
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return frameTotal;
 }
 
 //--------------------------------------------------------------
@@ -771,147 +747,134 @@ void ofxThreadedVideo::previousFrame(){
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getWidth(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getWidth();
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return width;
 }
 
 //--------------------------------------------------------------
 float ofxThreadedVideo::getHeight(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getHeight();
-    }else{
-        return 0;
-    }
+    ofScopedLock lock(mutex);
+    return height;
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isPaused(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].isPaused();
-    }else{
-        return false;
-    }
+    ofScopedLock lock(mutex);
+    return bIsPaused;
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoading(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(loadVideoID != VIDEO_NONE || pathsToLoad.size() > 0){
-        return true;
-    }else{
-        return false;
+    ofScopedLock lock(mutex);
+    return bIsLoading;
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::isLoading(string path){
+    ofScopedLock lock(ofxThreadedVideoGlobalMutex);
+    for(int i = 0; i < ofxThreadedVideoCommands.size(); i++){
+        if(ofxThreadedVideoCommands[i].getInstance() == instanceID){
+            if(ofxThreadedVideoCommands[i].getCommand() == "loadMovie"){
+                if(ofxThreadedVideoCommands[i].getArgument<string>(0) == path){
+                    return true;
+                }
+            }
+        }
     }
+    return false;
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoaded(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE && loadVideoID == VIDEO_NONE){
-        return videos[currentVideoID].isLoaded();
-    }else{
-        return false;
-    }
+    ofScopedLock lock(mutex);
+    return bLoaded;
 }
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isPlaying(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].isPlaying();
-    }else{
-        return false;
-    }
+    ofScopedLock lock(mutex);
+    return bIsPlaying;
 }
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getMovieName(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return names[currentVideoID];
-    }else{
-        return "";
-    }
+    ofScopedLock lock(mutex);
+    return movieName;
 }
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getMoviePath(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    if(currentVideoID != VIDEO_NONE){
-        return paths[currentVideoID];
-    }else if(loadVideoID != VIDEO_NONE){
-        return paths[loadVideoID];
-    }else if(loadPath != ""){
-        return loadPath;
-    }else if(pathsToLoad.size() > 0){
-        return pathsToLoad[0];
-    }else{
-        return "";
-    }
-}
-
-//--------------------------------------------------------------
-bool ofxThreadedVideo::isQueued(string path){
-    Poco::ScopedLock<ofMutex> lock(mutex);
-    for(int i = 0; i < pathsToLoad.size(); i++){
-        if(pathsToLoad[i] == path) return true;
-    }
-    if(loadVideoID != VIDEO_NONE){
-        return (path == paths[currentVideoID]);
-    }else{
-        return false;
-    }
-    
+    ofScopedLock lock(mutex);
+    return moviePath;
 }
 
 //--------------------------------------------------------------
 double ofxThreadedVideo::getFrameRate(){
-    Poco::ScopedLock<ofMutex> lock(mutex);
+    ofScopedLock lock(mutex);
     return frameRate;
 }
 
 #ifdef USE_JACK_AUDIO
 //--------------------------------------------------------------
 vector<string> ofxThreadedVideo::getAudioDevices(){
-    return videos[0].getAudioDevices();
+    lock();
+    ofxThreadedVideoGlobalMutex.lock();
+    audioDevices = video[currentVideoID].getAudioDevices();
+    ofxThreadedVideoGlobalMutex.unlock();
+    unlock();
+    return audioDevices;
+}
+
+////--------------------------------------------------------------
+//int ofxThreadedVideo::getAudioTrackList(){
+////    if(currentVideoID != VIDEO_NONE){
+////        return video[currentVideoID].getAudioTrackList();
+////    }
+////    return 0;
+//}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setAudioDevice(int deviceID){
+    ofxThreadedVideoCommand c("setAudioDevice", instanceID);
+    c.setArgument(deviceID);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
-int ofxThreadedVideo::getAudioTrackList(){
-    if(currentVideoID != VIDEO_NONE){
-        return videos[currentVideoID].getAudioTrackList();
-    }
-    return 0;
+void ofxThreadedVideo::setAudioDevice(string deviceID){
+    ofxThreadedVideoCommand c("setAudioDevice", instanceID);
+    c.setArgument(deviceID);
+    pushCommand(c);
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setAudioDevice(int ID){
-    audioDeviceIDInt = ID;
-    bUpdateAudioDevices = true;
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setAudioDevice(string deviceName){
-    audioDeviceIDString = deviceName;
-    bUpdateAudioDevices = true;
-}
-
-//--------------------------------------------------------------
-void ofxThreadedVideo::setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel, bool bResetChannels){
-    if(bResetChannels) audioChannelMap.clear();
-    AudioChannelMap m;
-    m.trackIndex = trackIndex;
-    m.oldChannel = oldChannelLabel;
-    m.newChannel = newChannelLabel;
-    audioChannelMap.push_back(m);
-    bUpdateAudioDevices = true;
+void ofxThreadedVideo::setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel){
+    ofxThreadedVideoCommand c("setAudioTrackToChannel", instanceID);
+    c.setArgument(trackIndex);
+    c.setArgument(oldChannelLabel);
+    c.setArgument(newChannelLabel);
+    pushCommand(c);
 }
 #endif
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setVerbose(bool b){
+    bVerbose = b;
+}
+
+//--------------------------------------------------------------
+int ofxThreadedVideo::getNextLoadID(){
+    // get the free slot in our videos array
+    switch (currentVideoID) {
+        case VIDEO_NONE:
+        case VIDEO_FLOP:
+            return VIDEO_FLIP;
+            break;
+        case VIDEO_FLIP:
+            return VIDEO_FLOP;
+            break;
+    }
+}
 
 //--------------------------------------------------------------
 string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventType){
@@ -921,11 +884,6 @@ string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventTyp
             break;
         case VIDEO_EVENT_LOAD_FAIL:
             return "VIDEO_EVENT_LOAD_FAIL";
-            break;
-        case VIDEO_EVENT_LOAD_BLOCKED:
-            return "VIDEO_EVENT_LOAD_BLOCKED";
-        case VIDEO_EVENT_LOAD_THREADBLOCKED:
-            return "VIDEO_EVENT_LOAD_THREADBLOCKED";
             break;
     }
 }

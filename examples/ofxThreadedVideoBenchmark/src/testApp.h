@@ -3,7 +3,7 @@
 #include "ofMain.h"
 #include "ofxThreadedVideo.h"
 
-#define MAX_VIDEOS 8
+#define MAX_VIDEOS 16
 
 class testApp : public ofBaseApp{
 
@@ -22,6 +22,7 @@ class testApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
 
+        int lastLoadTime, loadInterval;
         ofDirectory files;
 
         ofxThreadedVideo videos[MAX_VIDEOS];

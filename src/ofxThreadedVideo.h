@@ -1,14 +1,36 @@
 /*
- *  ofxThreadedVideo.h
- *  emptyExample
+ * ofxThreadedVideo.h
  *
- *  Created by gameover on 2/02/12.
- *  Copyright 2012 trace media. All rights reserved.
+ * Copyright 2010-2013 (c) Matthew Gingold http://gingold.com.au
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * If you're using this software for something cool consider sending
+ * me an email to let me know about your project: m@gingold.com.au
  *
  */
 
-#ifndef _H_OFXTHREADEDVIDEO
-#define _H_OFXTHREADEDVIDEO
+#ifndef _HofxTHREADEDVIDEO
+#define _HofxTHREADEDVIDEO
 
 #include <set>
 #include <deque>
@@ -27,9 +49,7 @@
 
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
-    VIDEO_EVENT_LOAD_FAIL,
-    VIDEO_EVENT_LOAD_BLOCKED,
-    VIDEO_EVENT_LOAD_THREADBLOCKED
+    VIDEO_EVENT_LOAD_FAIL
 };
 
 #ifdef USE_JACK_AUDIO
@@ -41,6 +61,17 @@ struct AudioChannelMap{
 #endif
 
 class ofxThreadedVideoEvent;
+class ofxThreadedVideoCommand;
+
+static ofMutex                          ofxThreadedVideoGlobalMutex;
+static bool                             ofxThreadedVideoGlobalCritical = false;
+static int                              ofxThreadedVideoGlobalInstanceID = 0;
+//static deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
+//static ofxThreadedVideoCommand          ofxThreadedVideoNullCommand; (declared below)
+
+static int ofxThreadedVideoLoadOk;
+static int ofxThreadedVideoLoadFail;
+
 class ofxThreadedVideo : public ofThread {
 
 public:
@@ -50,19 +81,13 @@ public:
     
     template <typename T>
     void setPlayer(){
-        videos[0].setPlayer(ofPtr<T>(new T));
-        videos[1].setPlayer(ofPtr<T>(new T));
+        video[0].setPlayer(ofPtr<T>(new T));
+        video[1].setPlayer(ofPtr<T>(new T));
     }
-//    void setPlayer(ofPtr<ofBaseVideoPlayer> newPlayer);
+
     ofPtr<ofBaseVideoPlayer> getPlayer();
 
-    void setUseAutoPlay(bool b);
-    bool getUseAutoPlay();
-
-    void setUseQueue(bool b);
-    bool getUseQueue();
-
-    bool loadMovie(string name);
+    bool loadMovie(string path);
     void setPixelFormat(ofPixelFormat pixelFormat);
     ofPixelFormat getPixelFormat();
     void closeMovie();
@@ -83,10 +108,12 @@ public:
     void setPosition(float pct);
     void setVolume(float volume);
     float getVolume();
+    
 #ifdef USE_QUICKTIME_7
     void setPan(float pan);
     float getPan();
 #endif
+    
     void setLoopState(ofLoopType state);
     int getLoopState();
     void setSpeed(float speed);
@@ -94,11 +121,6 @@ public:
 
     void setUseTexture(bool bUse);
     ofTexture &	getTextureReference();
-    
-    void setFixedTextureSize(float w, float h);
-    void setUseFixedTextureSize(bool b);
-    bool getUseFixedTextureSize();
-    void toggleUseFixedTextureSize();
     
     void draw(float x, float y, float w, float h);
     void draw(float x, float y);
@@ -126,16 +148,14 @@ public:
     bool isLoaded();
     bool isPlaying();
     bool isLoading();
-    bool isQueued(string path);
+    bool isLoading(string path);
     
-    //float width, height;
-
 #ifdef USE_JACK_AUDIO
     vector<string>  getAudioDevices();
-    int             getAudioTrackList();
-    void            setAudioDevice(int ID);
-    void            setAudioDevice(string deviceName);
-    void            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel, bool bResetChannels);
+//    int             getAudioTrackList();
+    void            setAudioDevice(int deviceID);
+    void            setAudioDevice(string deviceID);
+    void            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel);
 #endif
     
     string getMovieName();
@@ -146,67 +166,170 @@ public:
     ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
     string getEventTypeAsString(ofxThreadedVideoEventType eventType);
     
+    void setVerbose(bool b);
+    
+    int getQueueSize();
+    int getLoadOk();
+    int getLoadFail();
+    
 protected:
 
     void threadedFunction();
 
-private:
+    bool getGlobalSafe();
+    void setGlobalSafe();
+    void setGlobalUnSafe();
+    
+    void pushCommand(ofxThreadedVideoCommand& c, bool back = true);
+    ofxThreadedVideoCommand getCommand();
+    void popCommand();
 
     static const int VIDEO_NONE = -1;
     static const int VIDEO_FLIP = 0;
     static const int VIDEO_FLOP = 1;
 
-    void updatePixels(int videoID);
-    void updateTexture(int videoID);
-    void updateVideo(int videoID);
-
     int getNextLoadID();
 
-    int loadVideoID;
+    //--------------------------------------------------------------
+    
+    deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
+    
+    bool bLoaded;
+    bool bCriticalSection;
     int currentVideoID;
-
-    string loadPath;
-
-    float newPosition[2];
-    int newFrame[2];
-    float volume[2];
-    float pan[2];
-    bool bPaused[2];
-    float newSpeed[2];
-    int newLoopType[2];
-    int frame[2];
-    int totalframes[2];
-    float fixedWidth, fixedHeight;
-
-    bool bUseAutoPlay;
-    bool bUseQueue;
+    
+    ofVideoPlayer video[2];
+    ofPixels * pixels;
+    ofTexture drawTexture;
+    
     bool bUseTexture;
-    bool bUseFixedTextureSize;
+    bool bIsFrameNew;
+    bool bIsPaused;
+    bool bIsPlaying;
+    bool bIsLoading;
+    bool bIsMovieDone;
     
-    deque<string> pathsToLoad;
-    string paths[2];
-    string names[2];
-    bool bFrameNew[2];
-    ofPixels * pixels[2];
-    ofTexture textures[2];
-    ofVideoPlayer videos[2];
+    float width;
+    float height;
     
-#ifdef USE_JACK_AUDIO
-    vector<AudioChannelMap> audioChannelMap;
-    bool bUpdateAudioDevices;
-    string audioDeviceIDString;
-    int audioDeviceIDInt;
-#endif
+    float duration;
+    float speed;
+    float position;
     
+    float volume;
+    float pan;
+    
+    ofLoopType loopState;
+    
+    int frameCurrent;
+    int frameTotal;
+    
+    string movieName;
+    string moviePath;
+
     ofPixelFormat internalPixelFormat;
     
+#ifdef USE_JACK_AUDIO
+    vector<string> audioDevices;
+//    vector<AudioChannelMap> audioChannelMap;
+//    bool bUpdateAudioDevices;
+//    string audioDeviceIDString;
+//    int audioDeviceIDInt;
+#endif
+    
+    int instanceID;
+    
     double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
-
+    
+    bool bVerbose;
+    
+private:
+    
     // block copy ctor and assignment operator
     ofxThreadedVideo(const ofxThreadedVideo& other);
     ofxThreadedVideo& operator=(const ofxThreadedVideo&);
 
 };
+
+class ofxThreadedVideoCommand {
+    
+public:
+    
+    ofxThreadedVideoCommand(){
+        setCommand("NULL_COMMAND", -1);
+    }
+    ofxThreadedVideoCommand(string _command, int _instanceID){
+        setCommand(_command, _instanceID);
+    }
+    ~ofxThreadedVideoCommand(){
+        instanceID = -1;
+        command.clear();
+        args.clear();
+    }
+    
+    void setCommand(string _command, int _instanceID){
+        instanceID = _instanceID;
+        command = _command;
+    }
+    
+    int getInstance(){
+        return instanceID;
+    }
+    
+    string getCommand(){
+        return command;
+    }
+    
+    template<typename T>
+    void setArgument(T arg){
+        args.push_back(ofToString(arg));
+    }
+    
+    template<typename T>
+    T getArgument(int index){
+        if(index > args.size() || index < 0){
+            ofLogError() << "Argument index out of range: " << index << " : " << args.size();
+            return NULL;
+        }
+        T t; // template overload hack
+        return getArgument(index, t);
+    }
+    
+    string getArgument(int index, string t){
+        return args[index];
+    }
+    
+    int getArgument(int index, int t){
+        return ofToInt(args[index]);
+    }
+    
+    float getArgument(int index, float t){
+        return ofToFloat(args[index]);
+    }
+    
+    bool getArgument(int index, bool t){
+        return ofToBool(args[index]);
+    }
+    
+    string getCommandAsString(){
+        ostringstream os;
+        os << command << "(";
+        for(int i = 0; i < args.size(); i++){
+            os << args[i] << string(i < args.size() - 1 ? "," : "");
+        }
+        os << ")";
+        return os.str();
+    }
+    
+private:
+    
+    int instanceID;
+    string command;
+    vector<string> args;
+    
+};
+
+static ofxThreadedVideoCommand ofxThreadedVideoNullCommand;
 
 class ofxThreadedVideoEvent{
 

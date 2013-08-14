@@ -5,12 +5,29 @@ void testApp::setup(){
 
     ofSetLogLevel(OF_LOG_VERBOSE);
 
+    // uncomment to see the command queue logging
+    //video1.setVerbose(true);
+    //video2.setVerbose(true);
+    
     files.allowExt("mov");
-    files.listDir("D:/vJMedia/trains01/train1"); // put a video path here with several video files in a folder
+    files.listDir("/Users/gameover/Desktop/DeepDataTest/ANIME60"); // put a video path here with several video files in a folder
 
+    // ofxThreadedVideo is asynchronous - ie., it executes all commands
+    // on a background thread. However it now implements a FIFO queue for
+    // commands - this means you can call any 'setting' command before you
+    // you know the movie has loaded, as ofxThreadedVideo guarantees these
+    // will be executed in order. But be careful with this!! For instance
+    // you can't call video1.setFrame(ofRandom(video1.getNumTotalFrames())
+    // unless you are sure the movie is loaded.
+    
     video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
+    video1.play();
+    
     video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
-
+    video2.play();
+    
+    ofBackground(0, 0, 0);
+    
     ofAddListener(video1.threadedVideoEvent, this, &testApp::threadedVideoEvent);
     ofAddListener(video2.threadedVideoEvent, this, &testApp::threadedVideoEvent);
 }
@@ -35,7 +52,7 @@ void testApp::draw(){
 
 //--------------------------------------------------------------
 void testApp::threadedVideoEvent(ofxThreadedVideoEvent & event){
-    ofLogVerbose() << "VideoEvent:" << event.eventTypeAsString << "for" << event.path;
+    ofLogVerbose() << "VideoEvent: " << event.eventTypeAsString << " for " << event.path;
 }
 
 //--------------------------------------------------------------
@@ -45,15 +62,19 @@ void testApp::keyPressed(int key){
         case '<':
         case ',':
             video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
+            video1.play();
             break;
         case '>':
         case '.':
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
+            video2.play();
             break;
         case '?':
         case '/':
             video1.loadMovie(files.getPath(ofRandom(files.numFiles())));
+            video1.play();
             video2.loadMovie(files.getPath(ofRandom(files.numFiles())));
+            video2.play();
             break;
         case 'p':
             video1.setPaused(!video1.isPaused());
