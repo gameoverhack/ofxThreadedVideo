@@ -56,7 +56,11 @@ ofxThreadedVideo::ofxThreadedVideo(){
     // setup video instances
     video[0].setUseTexture(false);
     video[1].setUseTexture(false);
+    
     setPixelFormat(OF_PIXELS_RGB);
+    
+    drawTexture.allocate(1, 1, GL_RGB);
+    pixels = &video[0].getPixelsRef();
     
     // set vars to default values
     currentVideoID = VIDEO_FLIP;
@@ -86,8 +90,6 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     movieName = "";
     moviePath = "";
-    
-    pixels = &video[currentVideoID].getPixelsRef();
     
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
