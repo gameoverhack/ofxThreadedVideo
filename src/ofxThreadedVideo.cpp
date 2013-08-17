@@ -355,7 +355,7 @@ void ofxThreadedVideo::threadedFunction(){
                     if(bVerbose) ofLogVerbose() << instanceID << " - " << c.getCommandAsString();
                     if(video[videoID].loadMovie(c.getArgument<string>(0))){
                         if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
-                        
+
 //                        lock();
                         
                         width = video[videoID].getWidth();
@@ -383,7 +383,7 @@ void ofxThreadedVideo::threadedFunction(){
                         bLoaded = true;
                         
                         pixels = &video[videoID].getPixelsRef();
-//
+
                         unlock();
                         
                         bPopCommand = true;
@@ -393,6 +393,8 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         ofxThreadedVideoLoadOk++;
                     }else{
+                        
+                        ofLogError() << "Could not load: " << instanceID << " + " << c.getCommandAsString();
                         
                         ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_FAIL, this);
                         ofNotifyEvent(threadedVideoEvent, e, this);
