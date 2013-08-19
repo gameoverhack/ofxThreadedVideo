@@ -35,14 +35,7 @@
 #include <set>
 #include <deque>
 
-#include "ofLog.h"
-#include "ofConstants.h"
-#include "ofPixels.h"
-#include "ofTexture.h"
-#include "ofThread.h"
-#include "ofEvents.h"
-#include "ofVideoPlayer.h"
-#include "ofAppRunner.h"
+#include "ofMain.h"
 
 #define USE_QUICKTIME_7
 #define USE_JACK_AUDIO
@@ -60,6 +53,7 @@ struct AudioChannelMap{
 };
 #endif
 
+class ofxThreadedVideoFade;
 class ofxThreadedVideoEvent;
 class ofxThreadedVideoCommand;
 
@@ -162,7 +156,13 @@ public:
     string getMoviePath();
 
     double getFrameRate();
-
+    
+    void setFade(float fadeTarget);
+    void setFade(int frameStart, int durationMillis, float fadeTarget, bool fadeSound = false, bool fadeVideo = true, bool fadeOnce = false);
+    
+    float getFade();
+    void clearFades();
+    
     ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
     string getEventTypeAsString(ofxThreadedVideoEventType eventType);
     
@@ -227,14 +227,14 @@ protected:
     string movieName;
     string moviePath;
 
+    float fade;
+    float _fade;
+    deque<ofxThreadedVideoFade> fades;
+    
     ofPixelFormat internalPixelFormat;
     
 #ifdef USE_JACK_AUDIO
     vector<string> audioDevices;
-//    vector<AudioChannelMap> audioChannelMap;
-//    bool bUpdateAudioDevices;
-//    string audioDeviceIDString;
-//    int audioDeviceIDInt;
 #endif
     
     int instanceID;
@@ -249,6 +249,62 @@ private:
     ofxThreadedVideo(const ofxThreadedVideo& other);
     ofxThreadedVideo& operator=(const ofxThreadedVideo&);
 
+};
+
+class ofxThreadedVideoFade {
+    
+public:
+    
+    ofxThreadedVideoFade(){
+        fadeOriginal = -1.0;
+    };
+    ofxThreadedVideoFade(int _frameStart, int _frameEnd, float _fadeTarget, bool _fadeSound, bool _fadeVideo, bool _fadeOnce):
+    frameStart(_frameStart), frameEnd(_frameEnd), fadeTarget(_fadeTarget), fadeSound(_fadeSound), fadeVideo(_fadeVideo), fadeOnce(_fadeOnce){
+        fadeOriginal = -1.0;
+        frameDuration = frameEnd - frameStart;
+    };
+    ~ofxThreadedVideoFade(){};
+    
+    float getFade(float fadeCurrent, int frameCurrent){
+        
+        if(fadeOriginal == -1.0f) fadeOriginal = fadeCurrent;
+        
+        if((frameCurrent - frameStart) <= frameEnd){
+            
+            return fadeOriginal + (fadeTarget - fadeOriginal) * (float)((float)(frameCurrent - frameStart) / (float)frameDuration);
+        }else{
+            fadeOriginal = -1.0f;
+            return fadeTarget;
+        }
+        
+    }
+    
+    bool getIsFading(int frameCurrent){
+        if(frameCurrent >= frameStart && frameCurrent <= frameEnd){
+            return true;
+        }else{
+            fadeOriginal = -1.0f;
+            return false;
+        }
+    }
+    
+    bool getFadeDone(int frameCurrent){
+        if(frameCurrent > frameEnd){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    int frameStart;
+    int frameEnd;
+    float frameDuration;
+    float fadeTarget;
+    float fadeOriginal;
+    bool fadeSound;
+    bool fadeVideo;
+    bool fadeOnce;
+    
 };
 
 class ofxThreadedVideoCommand {
@@ -309,6 +365,10 @@ public:
     
     bool getArgument(int index, bool t){
         return ofToBool(args[index]);
+    }
+    
+    int getNumArguments(){
+        return args.size();
     }
     
     string getCommandAsString(){

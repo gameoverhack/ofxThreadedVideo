@@ -60,6 +60,10 @@ ofxThreadedVideo::ofxThreadedVideo(){
     setPixelFormat(OF_PIXELS_RGB);
     
     drawTexture.allocate(1, 1, GL_RGB);
+    ofPixels p;
+    p.allocate(1, 1, OF_IMAGE_COLOR);
+    p.set(0);
+    drawTexture.loadData(p.getPixels(), 1, 1, GL_RGB);
     pixels = &video[0].getPixelsRef();
     
     // set vars to default values
@@ -90,6 +94,9 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     movieName = "";
     moviePath = "";
+    
+    fade = 1.0f;
+    fades.clear();
     
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
@@ -183,7 +190,7 @@ void ofxThreadedVideo::update(){
         if(c.getInstance() == instanceID){
             if(c.getCommand() == "loadMovie" && bCanStop){
                 
-                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString() << " in update";
                 
                 video[videoID].stop();
                 
@@ -246,6 +253,8 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].stop();
                     
                     lock();
+                    fade = 1.0;
+                    fades.clear();
                     bIsPlaying = false;
                     bIsPaused = false; // ????
                     bIsLoading = false;
@@ -337,6 +346,47 @@ void ofxThreadedVideo::threadedFunction(){
                     bPopCommand = true;
                 }
                 
+                if(c.getCommand() == "setFade"){
+                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    
+                    int frameEnd;
+                    int frameStart = c.getArgument<int>(0);
+                    int durationMillis = c.getArgument<int>(1);
+                    float fadeTarget = c.getArgument<float>(2);
+                    bool fadeSound = c.getArgument<bool>(3);
+                    bool fadeVideo = c.getArgument<bool>(4);
+                    bool fadeOnce = c.getArgument<bool>(5);
+                    
+                    CLAMP(fadeTarget, 0.0f, 1.0f);
+                    
+                    if(frameStart == -1){ // fade is durationMillis from the end
+                        frameEnd = frameTotal;
+                        frameStart = frameTotal - ((float)durationMillis / 1000.0) * 25.0;
+                    }else{
+                        frameEnd = frameStart + ((float)durationMillis / 1000.0) * 25.0;
+                    }
+                    
+                    if(frameStart == frameEnd){
+                        _fade = fadeTarget;
+                        if(fadeVideo) fade = _fade;
+                        lock();
+                        if(fadeSound) video[videoID].setVolume(_fade);
+                        unlock();
+                    }else{
+                        frameEnd -= 1;
+                        
+                        assert(frameStart >= 0);
+                        assert(frameEnd >= frameStart);
+                        assert(frameEnd <= frameTotal);
+                        
+                        fades.push_back(ofxThreadedVideoFade(frameStart, frameEnd, fadeTarget, fadeSound, fadeVideo, fadeOnce));
+                    }
+                    
+
+                    
+                    bPopCommand = true;
+                }
+                
 #ifdef USE_JACK_AUDIO
                 if(c.getCommand() == "setAudioTrackToChannel"){
                     if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
@@ -354,10 +404,11 @@ void ofxThreadedVideo::threadedFunction(){
                 if(c.getCommand() == "loadMovie" && bCanLoad){
                     if(bVerbose) ofLogVerbose() << instanceID << " - " << c.getCommandAsString();
                     if(video[videoID].loadMovie(c.getArgument<string>(0))){
-                        if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                        if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString() << " in thread";;
 
 //                        lock();
                         
+                        fades.clear();
                         width = video[videoID].getWidth();
                         height = video[videoID].getHeight();
                         speed = video[videoID].getSpeed();
@@ -411,6 +462,33 @@ void ofxThreadedVideo::threadedFunction(){
             }
         
             lock();
+            
+            if(bIsFrameNew){
+                for(int i = 0; i < fades.size(); i++){
+                    
+                    ofxThreadedVideoFade& currentFade = fades.at(i);
+                    
+                    if(currentFade.getIsFading(frameCurrent)){
+                        _fade = currentFade.getFade(_fade, frameCurrent);
+                        
+                        if(currentFade.fadeVideo){
+                            if(fade != _fade) fade = _fade;
+                        }
+                        
+                        if(currentFade.fadeSound){
+                            if(video[videoID].getVolume() != _fade) video[videoID].setVolume(_fade);
+                        }
+                        
+                    }
+                    
+                    if(currentFade.fadeOnce && currentFade.getFadeDone(frameCurrent)){
+                        fades.erase(fades.begin() + i);
+                        i--;
+                    }
+
+                }
+            }
+            
             ofxThreadedVideoGlobalMutex.lock();
             
             if(bPopCommand){
@@ -520,11 +598,44 @@ void ofxThreadedVideo::closeMovie(){
     movieName = "";
     moviePath = "";
     
+    fade = 1.0f;
+    fades.clear();
+    
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
     
     ofxThreadedVideoGlobalMutex.unlock();
     unlock();
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setFade(float fadeTarget){
+    ofScopedLock lock(mutex);
+    _fade = fade = fadeTarget;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setFade(int frameStart, int durationMillis, float fadeTarget, bool fadeSound, bool fadeVideo, bool fadeOnce){
+    ofxThreadedVideoCommand c("setFade", instanceID);
+    c.setArgument(frameStart);
+    c.setArgument(durationMillis);
+    c.setArgument(fadeTarget);
+    c.setArgument(fadeSound);
+    c.setArgument(fadeVideo);
+    c.setArgument(fadeOnce);
+    pushCommand(c);
+}
+
+//--------------------------------------------------------------
+float ofxThreadedVideo::getFade(){
+    ofScopedLock lock(mutex);
+    return fade;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::clearFades(){
+    ofScopedLock lock(mutex);
+    fades.clear();
 }
 
 //--------------------------------------------------------------
@@ -670,7 +781,10 @@ ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
+    ofPushStyle();
+    ofSetColor(255 * fade, 255 * fade, 255 * fade, 255 * fade);
     drawTexture.draw(x, y, w, h);
+    ofPopStyle();
 }
 
 //--------------------------------------------------------------
