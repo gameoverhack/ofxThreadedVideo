@@ -253,7 +253,7 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].stop();
                     
                     lock();
-                    fade = 1.0;
+                    //fade = 1.0;
                     fades.clear();
                     bIsPlaying = false;
                     bIsPaused = false; // ????
