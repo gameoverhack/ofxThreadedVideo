@@ -11,8 +11,10 @@ If you are on 10.7 or 10.8 this is a good reference for how to compile against t
 
 Please also note that you will need to comment out:
 
+```
 #define USE_QUICKTIME_7
 #define USE_JACK_AUDIO
+```
 
 in the header file if they are not already commented out (sorry I keep forgetting to comment these out when I push changes so best to just make it default user action).
 
