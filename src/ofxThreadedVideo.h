@@ -29,8 +29,8 @@
  *
  */
 
-#ifndef _HofxTHREADEDVIDEO
-#define _HofxTHREADEDVIDEO
+#ifndef __H_OFXHREADEDVIDEO
+#define __H_OFXTHREADEDVIDEO
 
 #include <set>
 #include <deque>
