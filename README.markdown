@@ -9,6 +9,14 @@ Please note that this version is based on Quicktime 6 or 7 (ie., the 10.6 SDK) s
 
 If you are on 10.7 or 10.8 this is a good reference for how to compile against the 'deprecated' SDK: http://forum.openframeworks.cc/index.php/topic,10343.msg47100.html#msg47100
 
+And you will need a:
+
+```
+#define OF_VIDEO_PLAYER_QUICKTIME
+```
+
+Before you include "ofMain.h" in your header file.
+
 Please also note that you will need to comment out:
 
 ```
@@ -17,6 +25,7 @@ Please also note that you will need to comment out:
 ```
 
 in the header file if they are not already commented out (sorry I keep forgetting to comment these out when I push changes so best to just make it default user action).
+
 
 Since it is non-blocking, or asynchronous ofxThreadedVideo cannot always be used as a direct drop-in for an ofVideoPlayer - but this version is closer to that. Previously you had to wait until a video was fully loaded before issuing any other commands that manipulated or queried the video. This version implements a new queueing system that allows all 'set' commands to be issued as though the video were a normal 'blocking' ofVideoPlayer. However any 'get' method must (for obvious reasons) wait until the video is loaded (this can be achieved by watching the isLoaded() method, or using the built in event model). So as long as your code only uses setFrame, setVolume, setLoopState, etc you can just make calls as though it were a synchronous object - but if you need to call a get function (e.g.., getFrame, getVolume) you must check that the video is loaded.
 
