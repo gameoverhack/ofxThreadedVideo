@@ -143,6 +143,7 @@ public:
     bool isPlaying();
     bool isLoading();
     bool isLoading(string path);
+    bool isTextureReady();
     
 #ifdef USE_JACK_AUDIO
     vector<string>  getAudioDevices();
@@ -206,6 +207,7 @@ protected:
     bool bIsFrameNew;
     bool bIsPaused;
     bool bIsPlaying;
+    bool bIsTextureReady;
     bool bIsLoading;
     bool bIsMovieDone;
     

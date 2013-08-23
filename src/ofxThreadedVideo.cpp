@@ -147,6 +147,8 @@ void ofxThreadedVideo::update(){
             
             if(bIsFrameNew){
                 
+                if(!bIsTextureReady) bIsTextureReady = true;
+                
                 if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
                     drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
                 }
@@ -200,6 +202,7 @@ void ofxThreadedVideo::update(){
                 bLoaded = false;
                 bIsLoading = true;
                 bIsPlaying = false;
+                bIsMovieDone = false;
                 unlock();
                 
             }
@@ -430,6 +433,7 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         bIsPaused = true;
                         bIsPlaying = false;
+                        bIsTextureReady = false;
                         bIsLoading = false;
                         bLoaded = true;
                         
@@ -900,6 +904,12 @@ bool ofxThreadedVideo::isLoading(string path){
         }
     }
     return false;
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::isTextureReady(){
+    ofScopedLock lock(mutex);
+    return bIsTextureReady;
 }
 
 //--------------------------------------------------------------
