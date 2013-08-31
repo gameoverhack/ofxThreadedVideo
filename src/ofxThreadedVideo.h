@@ -101,9 +101,9 @@ public:
 
     void setPosition(float pct);
     void setVolume(float volume);
-    float getVolume();
-    
+
 #ifdef USE_QUICKTIME_7
+    float getVolume(); // we should implement for QT6
     void setPan(float pan);
     float getPan();
 #endif

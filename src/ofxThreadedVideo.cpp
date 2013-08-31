@@ -277,16 +277,17 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].setPosition(position);
                     bPopCommand = true;
                 }
-                
+
                 if(c.getCommand() == "setVolume"){
                     if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
                     lock();
                     volume = c.getArgument<float>(0);
                     unlock();
-                    video[videoID].setPan(volume);
+                    video[videoID].setVolume(volume);
                     bPopCommand = true;
                 }
                 
+#ifdef USE_QUICKTIME_7
                 if(c.getCommand() == "setPan"){
                     if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
                     lock();
@@ -295,6 +296,7 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].setPan(pan);
                     bPopCommand = true;
                 }
+#endif
                 
                 if(c.getCommand() == "setLoopState"){
                     if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
@@ -419,8 +421,10 @@ void ofxThreadedVideo::threadedFunction(){
                         position = video[videoID].getPosition();
                         frameCurrent = video[videoID].getCurrentFrame();
                         frameTotal = video[videoID].getTotalNumFrames();
-                        volume = video[videoID].getVolume();
+#ifdef USE_QUICKTIME_7
+                        volume = video[videoID].getVolume(); // we should implement for QT6
                         pan = video[videoID].getPan();
+#endif
                         loopState = video[videoID].getLoopState();
                         
                         moviePath = c.getArgument<string>(0);
@@ -435,6 +439,7 @@ void ofxThreadedVideo::threadedFunction(){
                         bIsPlaying = false;
                         bIsTextureReady = false;
                         bIsLoading = false;
+                        bIsMovieDone = false;
                         bLoaded = true;
                         
                         pixels = &video[videoID].getPixelsRef();
@@ -478,11 +483,11 @@ void ofxThreadedVideo::threadedFunction(){
                         if(currentFade.fadeVideo){
                             if(fade != _fade) fade = _fade;
                         }
-                        
-                        if(currentFade.fadeSound){
+#ifdef USE_QUICKTIME_7
+                        if(currentFade.fadeSound){ // we should implement for QT6
                             if(video[videoID].getVolume() != _fade) video[videoID].setVolume(_fade);
                         }
-                        
+#endif
                     }
                     
                     if(currentFade.fadeOnce && currentFade.getFadeDone(frameCurrent)){
@@ -688,13 +693,13 @@ void ofxThreadedVideo::setVolume(float _volume){
     pushCommand(c);
 }
 
+#ifdef USE_QUICKTIME_7
 //--------------------------------------------------------------
-float ofxThreadedVideo::getVolume(){
+float ofxThreadedVideo::getVolume(){ // we should implement for QT6
     ofScopedLock lock(mutex);
     return volume;
 }
 
-#ifdef USE_QUICKTIME_7
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPan(float _pan){
     CLAMP(_pan, -1.0f, 1.0f);
