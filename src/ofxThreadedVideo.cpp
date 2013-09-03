@@ -190,11 +190,30 @@ void ofxThreadedVideo::update(){
         ofxThreadedVideoGlobalMutex.unlock();
 
         if(c.getInstance() == instanceID){
+            
+            if(c.getCommand() == "stop" && bCanStop){
+                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                video[videoID].stop();
+                
+                lock();
+                //fade = 1.0;
+                fades.clear();
+                bIsPlaying = false;
+                bIsPaused = false; // ????
+                bIsLoading = false;
+                bIsFrameNew = false;
+                bIsMovieDone = false;
+                bLoaded = false;
+                unlock();
+                
+                bPopCommand = true;
+            }
+            
             if(c.getCommand() == "loadMovie" && bCanStop){
                 
                 if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString() << " in update";
                 
-                video[videoID].stop();
+                if(bIsPlaying) video[videoID].stop();
                 
                 lock();
                 currentVideoID = getNextLoadID();
@@ -210,6 +229,9 @@ void ofxThreadedVideo::update(){
         
         lock();
         ofxThreadedVideoGlobalMutex.lock();
+        
+        if(bPopCommand) popCommand();
+        
         ofxThreadedVideoGlobalCritical = false;
         bCriticalSection = false;
         ofxThreadedVideoGlobalMutex.unlock();
@@ -246,24 +268,6 @@ void ofxThreadedVideo::threadedFunction(){
                     lock();
                     bIsPlaying = true;
                     bIsPaused = false;
-                    unlock();
-                    
-                    bPopCommand = true;
-                }
-                
-                if(c.getCommand() == "stop"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
-                    video[videoID].stop();
-                    
-                    lock();
-                    //fade = 1.0;
-                    fades.clear();
-                    bIsPlaying = false;
-                    bIsPaused = false; // ????
-                    bIsLoading = false;
-                    bIsFrameNew = false;
-                    bIsMovieDone = false;
-                    bLoaded = false;
                     unlock();
                     
                     bPopCommand = true;
@@ -500,10 +504,7 @@ void ofxThreadedVideo::threadedFunction(){
             
             ofxThreadedVideoGlobalMutex.lock();
             
-            if(bPopCommand){
-//                video[videoID].update();
-                popCommand();
-            }
+            if(bPopCommand) popCommand();
             
             ofxThreadedVideoGlobalCritical = false;
             bCriticalSection = false;
