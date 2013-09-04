@@ -184,7 +184,7 @@ void ofxThreadedVideo::update(){
         ofxThreadedVideoGlobalCritical = true;
         bCriticalSection = true;
         ofxThreadedVideoCommand c = getCommand();
-        bool bCanStop = bLoaded;
+        bool bCanStop = (bLoaded && !bIsLoading) || (!bLoaded && !bIsLoading);
         bool bPopCommand = false;
         unlock();
         ofxThreadedVideoGlobalMutex.unlock();
@@ -192,8 +192,9 @@ void ofxThreadedVideo::update(){
         if(c.getInstance() == instanceID){
             
             if(c.getCommand() == "stop" && bCanStop){
-                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
-                video[videoID].stop();
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                
+                if(bIsPlaying) video[videoID].stop();
                 
                 lock();
                 //fade = 1.0;
@@ -211,7 +212,7 @@ void ofxThreadedVideo::update(){
             
             if(c.getCommand() == "loadMovie" && bCanStop){
                 
-                if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString() << " in update";
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " execute in update";
                 
                 if(bIsPlaying) video[videoID].stop();
                 
@@ -262,7 +263,7 @@ void ofxThreadedVideo::threadedFunction(){
             if(c.getInstance() == instanceID){
                 
                 if(c.getCommand() == "play"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].play();
                     
                     lock();
@@ -274,7 +275,7 @@ void ofxThreadedVideo::threadedFunction(){
                 }
                 
                 if(c.getCommand() == "setPosition"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     position = c.getArgument<float>(0);
                     unlock();
@@ -283,7 +284,7 @@ void ofxThreadedVideo::threadedFunction(){
                 }
 
                 if(c.getCommand() == "setVolume"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     volume = c.getArgument<float>(0);
                     unlock();
@@ -293,7 +294,7 @@ void ofxThreadedVideo::threadedFunction(){
                 
 #ifdef USE_QUICKTIME_7
                 if(c.getCommand() == "setPan"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     pan = c.getArgument<float>(0);
                     unlock();
@@ -303,7 +304,7 @@ void ofxThreadedVideo::threadedFunction(){
 #endif
                 
                 if(c.getCommand() == "setLoopState"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     loopState = (ofLoopType)c.getArgument<int>(0);
                     unlock();
@@ -312,7 +313,7 @@ void ofxThreadedVideo::threadedFunction(){
                 }
                 
                 if(c.getCommand() == "setSpeed"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     speed = c.getArgument<float>(0);
                     unlock();
@@ -321,7 +322,7 @@ void ofxThreadedVideo::threadedFunction(){
                 }
                 
                 if(c.getCommand() == "setFrame"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     int frameTarget = c.getArgument<int>(0);
                     CLAMP(frameTarget, 0, frameTotal);
                     video[videoID].setFrame(frameTarget);
@@ -329,7 +330,7 @@ void ofxThreadedVideo::threadedFunction(){
                 }
                 
                 if(c.getCommand() == "setPaused"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
                     bIsPaused = c.getArgument<bool>(0);
                     unlock();
@@ -338,25 +339,25 @@ void ofxThreadedVideo::threadedFunction(){
                 }
                 
                 if(c.getCommand() == "setAnchorPercent"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].setAnchorPercent(c.getArgument<float>(0), c.getArgument<float>(0));
                     bPopCommand = true;
                 }
 
                 if(c.getCommand() == "setAnchorPoint"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].setAnchorPercent(c.getArgument<float>(0), c.getArgument<float>(0));
                     bPopCommand = true;
                 }
                 
                 if(c.getCommand() == "resetAnchor"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].resetAnchor();
                     bPopCommand = true;
                 }
                 
                 if(c.getCommand() == "setFade"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     
                     int frameEnd;
                     int frameStart = c.getArgument<int>(0);
@@ -398,22 +399,24 @@ void ofxThreadedVideo::threadedFunction(){
                 
 #ifdef USE_JACK_AUDIO
                 if(c.getCommand() == "setAudioTrackToChannel"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].setAudioTrackToChannel(c.getArgument<int>(0), c.getArgument<int>(1), c.getArgument<int>(2));
                     bPopCommand = true;
                 }
                 
                 if(c.getCommand() == "setAudioDevice"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     video[videoID].setAudioDevice(c.getArgument<string>(0));
                     bPopCommand = true;
                 }
 #endif
                 
                 if(c.getCommand() == "loadMovie" && bCanLoad){
-                    if(bVerbose) ofLogVerbose() << instanceID << " - " << c.getCommandAsString();
+                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                    
                     if(video[videoID].loadMovie(c.getArgument<string>(0))){
-                        if(bVerbose) ofLogVerbose() << instanceID << " + " << c.getCommandAsString() << " in thread";;
+                        
+                        if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " executed in thread";;
 
 //                        lock();
                         
@@ -525,7 +528,7 @@ void ofxThreadedVideo::threadedFunction(){
 void ofxThreadedVideo::pushCommand(ofxThreadedVideoCommand& c, bool back){
     lock();
     ofxThreadedVideoGlobalMutex.lock();
-    if(bVerbose) ofLogVerbose() << "Push command: " << c.getCommandAsString();
+    if(bVerbose) ofLogVerbose() << instanceID << " + push " << c.getCommandAsString();
     if(back){
         ofxThreadedVideoCommands.push_back(c);
     }else{
@@ -537,6 +540,8 @@ void ofxThreadedVideo::pushCommand(ofxThreadedVideoCommand& c, bool back){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::popCommand(){
+    ofxThreadedVideoCommand& c = ofxThreadedVideoCommands.front();
+    if(bVerbose) ofLogVerbose() << instanceID << " - pop " << c.getCommandAsString();
     ofxThreadedVideoCommands.pop_front();
 }
 
