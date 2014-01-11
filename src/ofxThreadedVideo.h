@@ -169,6 +169,9 @@ public:
     
     void setVerbose(bool b);
     
+    void flush();
+    void finish();
+    
     int getQueueSize();
     int getLoadOk();
     int getLoadFail();
@@ -205,6 +208,7 @@ protected:
     
     bool bUseTexture;
     bool bIsFrameNew;
+    bool bForceFrameNew;
     bool bIsPaused;
     bool bIsPlaying;
     bool bIsTextureReady;

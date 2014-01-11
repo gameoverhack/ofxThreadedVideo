@@ -31,14 +31,35 @@
 
 #include "ofxThreadedVideo.h"
 
+//--------------------------------------------------------------
+void ofxThreadedVideo::flush(){
+    lock();
+    ofxThreadedVideoGlobalMutex.lock();
+    ofxThreadedVideoCommands.clear();
+    ofxThreadedVideoGlobalMutex.unlock();
+    unlock();
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::finish(){
+    while(getQueueSize() > 0){
+        update();
+    }
+    update();
+}
+
+//--------------------------------------------------------------
 int ofxThreadedVideo::getQueueSize(){
-//        ofScopedLock lock(ofxThreadedVideoGlobalMutex);
+//    ofScopedLock lock(ofxThreadedVideoGlobalMutex);
     return ofxThreadedVideoCommands.size();
 }
+
+//--------------------------------------------------------------
 int ofxThreadedVideo::getLoadOk(){
     return ofxThreadedVideoLoadOk;
 }
 
+//--------------------------------------------------------------
 int ofxThreadedVideo::getLoadFail(){
     return ofxThreadedVideoLoadFail;
 }
@@ -145,15 +166,23 @@ void ofxThreadedVideo::update(){
             bIsMovieDone = video[videoID].getIsMovieDone();
 //            unlock();
             
-            if(bIsFrameNew){
+            if(bIsFrameNew || bForceFrameNew){
+                
+                if(bForceFrameNew) lock();
                 
                 if(!bIsTextureReady) bIsTextureReady = true;
                 
                 if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
                     drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
                 }
+                
                 unsigned char * pixels = video[videoID].getPixels();
                 if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+                
+                if(bForceFrameNew){
+                    bForceFrameNew = false;
+                    unlock();
+                }
                 
                 // calculate frameRate -> taken from ofAppRunner
                 prevMillis = ofGetElapsedTimeMillis();
@@ -193,9 +222,7 @@ void ofxThreadedVideo::update(){
             
             if(c.getCommand() == "stop" && bCanStop){
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                
                 if(bIsPlaying) video[videoID].stop();
-                
                 lock();
                 //fade = 1.0;
                 fades.clear();
@@ -206,16 +233,12 @@ void ofxThreadedVideo::update(){
                 bIsMovieDone = false;
                 bLoaded = false;
                 unlock();
-                
                 bPopCommand = true;
             }
             
             if(c.getCommand() == "loadMovie" && bCanStop){
-                
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " execute in update";
-                
                 if(bIsPlaying) video[videoID].stop();
-                
                 lock();
                 currentVideoID = getNextLoadID();
                 bIsPaused = false;
@@ -224,8 +247,17 @@ void ofxThreadedVideo::update(){
                 bIsPlaying = false;
                 bIsMovieDone = false;
                 unlock();
-                
             }
+            
+            if(c.getCommand() == "setSpeed"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                lock();
+                speed = c.getArgument<float>(0);
+                unlock();
+                video[videoID].setSpeed(speed);
+                bPopCommand = true;
+            }
+            
         }
         
         lock();
@@ -312,20 +344,21 @@ void ofxThreadedVideo::threadedFunction(){
                     bPopCommand = true;
                 }
                 
-                if(c.getCommand() == "setSpeed"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    lock();
-                    speed = c.getArgument<float>(0);
-                    unlock();
-                    video[videoID].setSpeed(speed);
-                    bPopCommand = true;
-                }
+//                if(c.getCommand() == "setSpeed"){
+//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+//                    lock();
+//                    speed = c.getArgument<float>(0);
+//                    unlock();
+//                    video[videoID].setSpeed(speed);
+//                    bPopCommand = true;
+//                }
                 
                 if(c.getCommand() == "setFrame"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     int frameTarget = c.getArgument<int>(0);
                     CLAMP(frameTarget, 0, frameTotal);
                     video[videoID].setFrame(frameTarget);
+                    bForceFrameNew = true;
                     bPopCommand = true;
                 }
                 
@@ -459,6 +492,7 @@ void ofxThreadedVideo::threadedFunction(){
                         ofNotifyEvent(threadedVideoEvent, e, this);
                         
                         ofxThreadedVideoLoadOk++;
+                        
                     }else{
                         
                         ofLogError() << "Could not load: " << instanceID << " + " << c.getCommandAsString();
@@ -685,7 +719,7 @@ bool ofxThreadedVideo::getIsMovieDone(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPosition(float _pct){
-    CLAMP(_pct, 0.0f, 1.0f);
+    _pct = CLAMP(_pct, 0.0f, 1.0f);
     ofxThreadedVideoCommand c("setPosition", instanceID);
     c.setArgument(_pct);
     pushCommand(c);
@@ -693,7 +727,7 @@ void ofxThreadedVideo::setPosition(float _pct){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setVolume(float _volume){
-    CLAMP(_volume, 0.0f, 1.0f);
+    _volume = CLAMP(_volume, 0.0f, 1.0f);
     ofxThreadedVideoCommand c("setVolume", instanceID);
     c.setArgument(_volume);
     pushCommand(c);
@@ -708,7 +742,7 @@ float ofxThreadedVideo::getVolume(){ // we should implement for QT6
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::setPan(float _pan){
-    CLAMP(_pan, -1.0f, 1.0f);
+    _pan = CLAMP(_pan, -1.0f, 1.0f);
     ofxThreadedVideoCommand c("setPan", instanceID);
     c.setArgument(_pan);
     pushCommand(c);
@@ -735,9 +769,10 @@ int ofxThreadedVideo::getLoopState(){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setSpeed(float speed){
+void ofxThreadedVideo::setSpeed(float _speed){
+    _speed = CLAMP(_speed, -1.9, 4.0);
     ofxThreadedVideoCommand c("setSpeed", instanceID);
-    c.setArgument(speed);
+    c.setArgument(_speed);
     pushCommand(c);
 }
 
