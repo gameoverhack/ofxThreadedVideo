@@ -258,6 +258,19 @@ void ofxThreadedVideo::update(){
                 bPopCommand = true;
             }
             
+            if(c.getCommand() == "setFrame"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                lock();
+                int frameTarget = c.getArgument<int>(0);
+                bForceFrameNew = true;
+                frameTarget = CLAMP(frameTarget, 0, frameTotal);
+                //cout << "setframe A: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
+                video[videoID].setFrame(frameTarget);
+                //cout << "setframe B: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
+                unlock();
+                bPopCommand = true;
+            }
+            
         }
         
         lock();
@@ -353,14 +366,27 @@ void ofxThreadedVideo::threadedFunction(){
 //                    bPopCommand = true;
 //                }
                 
-                if(c.getCommand() == "setFrame"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    int frameTarget = c.getArgument<int>(0);
-                    CLAMP(frameTarget, 0, frameTotal);
-                    video[videoID].setFrame(frameTarget);
-                    bForceFrameNew = true;
-                    bPopCommand = true;
-                }
+//                if(c.getCommand() == "setFrame"){
+//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+//                    int frameTarget = c.getArgument<int>(0);
+//                    CLAMP(frameTarget, 0, frameTotal);
+//                    video[videoID].setFrame(frameTarget);
+//                    bForceFrameNew = true;
+//                    bPopCommand = true;
+//                }
+                
+//                if(c.getCommand() == "setFrame"){
+//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+//                    lock();
+//                    int frameTarget = c.getArgument<int>(0);
+//                    bForceFrameNew = true;
+//                    frameTarget = CLAMP(frameTarget, 0, frameTotal);
+//                    cout << "setframe A: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
+//                    video[videoID].setFrame(frameTarget);
+//                    cout << "setframe B: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
+//                    unlock();
+//                    bPopCommand = true;
+//                }
                 
                 if(c.getCommand() == "setPaused"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
@@ -614,6 +640,7 @@ void ofxThreadedVideo::close(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::closeMovie(){
+    //waitForThread(); ?
     lock();
     ofxThreadedVideoGlobalMutex.lock();
     
