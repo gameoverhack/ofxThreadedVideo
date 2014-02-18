@@ -70,9 +70,13 @@ ofxThreadedVideo::ofxThreadedVideo(){
     instanceID = ofxThreadedVideoGlobalInstanceID;
     ofxThreadedVideoGlobalInstanceID++;
     
+
+#ifdef OF_VIDEO_PLAYER_GSTREAMER
+    setPlayer<ofGstVideoPlayer>();
+#else
     initializeQuicktime();
-    
     setPlayer<ofQuickTimePlayer>();
+#endif
     
     // setup video instances
     video[0].setUseTexture(false);
@@ -444,9 +448,9 @@ void ofxThreadedVideo::threadedFunction(){
                     }else{
                         frameEnd -= 1;
                         
-                        assert(frameStart >= 0);
-                        assert(frameEnd >= frameStart);
-                        assert(frameEnd <= frameTotal);
+                        // assert(frameStart >= 0);
+                        // assert(frameEnd >= frameStart);
+                        // assert(frameEnd <= frameTotal);
                         
                         fades.push_back(ofxThreadedVideoFade(frameStart, frameEnd, fadeTarget, fadeSound, fadeVideo, fadeOnce));
                     }
@@ -540,7 +544,7 @@ void ofxThreadedVideo::threadedFunction(){
             lock();
             
             if(bIsFrameNew){
-                for(int i = 0; i < fades.size(); i++){
+                for(unsigned int i = 0; i < fades.size(); i++){
                     
                     ofxThreadedVideoFade& currentFade = fades.at(i);
                     
@@ -967,7 +971,7 @@ bool ofxThreadedVideo::isLoading(){
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoading(string path){
     ofScopedLock lock(ofxThreadedVideoGlobalMutex);
-    for(int i = 0; i < ofxThreadedVideoCommands.size(); i++){
+    for(unsigned int i = 0; i < ofxThreadedVideoCommands.size(); i++){
         if(ofxThreadedVideoCommands[i].getInstance() == instanceID){
             if(ofxThreadedVideoCommands[i].getCommand() == "loadMovie"){
                 if(ofxThreadedVideoCommands[i].getArgument<string>(0) == path){
@@ -1071,6 +1075,7 @@ int ofxThreadedVideo::getNextLoadID(){
         case VIDEO_FLOP:
             return VIDEO_FLIP;
             break;
+        default:
         case VIDEO_FLIP:
             return VIDEO_FLOP;
             break;
@@ -1083,6 +1088,7 @@ string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventTyp
         case VIDEO_EVENT_LOAD_OK:
             return "VIDEO_EVENT_LOAD_OK";
             break;
+        default:
         case VIDEO_EVENT_LOAD_FAIL:
             return "VIDEO_EVENT_LOAD_FAIL";
             break;
