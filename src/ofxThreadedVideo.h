@@ -29,7 +29,7 @@
  *
  */
 
-#ifndef __H_OFXHREADEDVIDEO
+#ifndef __H_OFXTHREADEDVIDEO
 #define __H_OFXTHREADEDVIDEO
 
 #include <set>
