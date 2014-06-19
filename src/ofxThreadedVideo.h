@@ -37,8 +37,11 @@
 
 #include "ofMain.h"
 
+#ifndef OF_VIDEO_PLAYER_GSTREAMER
 #define USE_QUICKTIME_7
 #define USE_JACK_AUDIO
+#endif
+
 
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
@@ -380,7 +383,7 @@ public:
     string getCommandAsString(){
         ostringstream os;
         os << command << "(";
-        for(int i = 0; i < args.size(); i++){
+        for(unsigned int i = 0; i < args.size(); i++){
             os << args[i] << string(i < args.size() - 1 ? "," : "");
         }
         os << ")";
