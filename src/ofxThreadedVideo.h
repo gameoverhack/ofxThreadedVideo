@@ -34,11 +34,12 @@
 
 #include <set>
 #include <deque>
+#include <assert.h>
 
 #include "ofMain.h"
 
 #define USE_QUICKTIME_7
-#define USE_JACK_AUDIO
+//#define USE_JACK_AUDIO
 
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
@@ -53,209 +54,8 @@ struct AudioChannelMap{
 };
 #endif
 
-class ofxThreadedVideoFade;
+class ofxThreadedVideo;
 class ofxThreadedVideoEvent;
-class ofxThreadedVideoCommand;
-
-static ofMutex                          ofxThreadedVideoGlobalMutex;
-static bool                             ofxThreadedVideoGlobalCritical = false;
-static int                              ofxThreadedVideoGlobalInstanceID = 0;
-//static deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
-//static ofxThreadedVideoCommand          ofxThreadedVideoNullCommand; (declared below)
-
-static int ofxThreadedVideoLoadOk;
-static int ofxThreadedVideoLoadFail;
-
-class ofxThreadedVideo : public ofThread {
-
-public:
-
-    ofxThreadedVideo();
-    ~ofxThreadedVideo();
-    
-    template <typename T>
-    void setPlayer(){
-        video[0].setPlayer(ofPtr<T>(new T));
-        video[1].setPlayer(ofPtr<T>(new T));
-    }
-
-    ofPtr<ofBaseVideoPlayer> getPlayer();
-
-    bool loadMovie(string path);
-    void setPixelFormat(ofPixelFormat pixelFormat);
-    ofPixelFormat getPixelFormat();
-    void closeMovie();
-    void close();
-
-    void update();
-    void play();
-    void stop();
-
-    bool isFrameNew();
-    unsigned char * getPixels();
-    ofPixelsRef	getPixelsRef();
-    float getPosition();
-    float getSpeed();
-    float getDuration();
-    bool getIsMovieDone();
-
-    void setPosition(float pct);
-    void setVolume(float volume);
-
-#ifdef USE_QUICKTIME_7
-    float getVolume(); // we should implement for QT6
-    void setPan(float pan);
-    float getPan();
-#endif
-    
-    void setLoopState(ofLoopType state);
-    int getLoopState();
-    void setSpeed(float speed);
-    void setFrame(int frame);
-
-    void setUseTexture(bool bUse);
-    ofTexture &	getTextureReference();
-    
-    void draw(float x, float y, float w, float h);
-    void draw(float x, float y);
-    void draw(const ofPoint & p);
-    void draw(const ofRectangle & r);
-    void draw();
-
-    void setAnchorPercent(float xPct, float yPct);
-    void setAnchorPoint(float x, float y);
-    void resetAnchor();
-
-    void setPaused(bool bPause);
-
-    int getCurrentFrame();
-    int getTotalNumFrames();
-
-    void firstFrame();
-    void nextFrame();
-    void previousFrame();
-
-    float getHeight();
-    float getWidth();
-
-    bool isPaused();
-    bool isLoaded();
-    bool isPlaying();
-    bool isLoading();
-    bool isLoading(string path);
-    bool isTextureReady();
-    
-#ifdef USE_JACK_AUDIO
-    vector<string>  getAudioDevices();
-//    int             getAudioTrackList();
-    void            setAudioDevice(int deviceID);
-    void            setAudioDevice(string deviceID);
-    void            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel);
-#endif
-    
-    string getMovieName();
-    string getMoviePath();
-
-    double getFrameRate();
-    
-    void setFade(float fadeTarget);
-    void setFade(int frameStart, int durationMillis, float fadeTarget, bool fadeSound = false, bool fadeVideo = true, bool fadeOnce = false);
-    
-    float getFade();
-    void clearFades();
-    
-    ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
-    string getEventTypeAsString(ofxThreadedVideoEventType eventType);
-    
-    void setVerbose(bool b);
-    
-    void flush();
-    void finish();
-    
-    int getQueueSize();
-    int getLoadOk();
-    int getLoadFail();
-    
-protected:
-
-    void threadedFunction();
-
-    bool getGlobalSafe();
-    void setGlobalSafe();
-    void setGlobalUnSafe();
-    
-    void pushCommand(ofxThreadedVideoCommand& c, bool back = true);
-    ofxThreadedVideoCommand getCommand();
-    void popCommand();
-
-    static const int VIDEO_NONE = -1;
-    static const int VIDEO_FLIP = 0;
-    static const int VIDEO_FLOP = 1;
-
-    int getNextLoadID();
-
-    //--------------------------------------------------------------
-    
-    deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
-    
-    bool bLoaded;
-    bool bCriticalSection;
-    int currentVideoID;
-    
-    ofVideoPlayer video[2];
-    ofPixels * pixels;
-    ofTexture drawTexture;
-    
-    bool bUseTexture;
-    bool bIsFrameNew;
-    bool bForceFrameNew;
-    bool bIsPaused;
-    bool bIsPlaying;
-    bool bIsTextureReady;
-    bool bIsLoading;
-    bool bIsMovieDone;
-    
-    float width;
-    float height;
-    
-    float duration;
-    float speed;
-    float position;
-    
-    float volume;
-    float pan;
-    
-    ofLoopType loopState;
-    
-    int frameCurrent;
-    int frameTotal;
-    
-    string movieName;
-    string moviePath;
-
-    float fade;
-    float _fade;
-    deque<ofxThreadedVideoFade> fades;
-    
-    ofPixelFormat internalPixelFormat;
-    
-#ifdef USE_JACK_AUDIO
-    vector<string> audioDevices;
-#endif
-    
-    int instanceID;
-    
-    double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
-    
-    bool bVerbose;
-    
-private:
-    
-    // block copy ctor and assignment operator
-    ofxThreadedVideo(const ofxThreadedVideo& other);
-    ofxThreadedVideo& operator=(const ofxThreadedVideo&);
-
-};
 
 class ofxThreadedVideoFade {
     
@@ -353,8 +153,7 @@ public:
             ofLogError() << "Argument index out of range: " << index << " : " << args.size();
             return NULL;
         }
-        T t; // template overload hack
-        return getArgument(index, t);
+        return getArgument(index, T());
     }
     
     string getArgument(int index, string t){
@@ -396,6 +195,213 @@ private:
 };
 
 static ofxThreadedVideoCommand ofxThreadedVideoNullCommand;
+
+static ofMutex                          ofxThreadedVideoGlobalMutex;
+static bool                             ofxThreadedVideoGlobalCritical = false;
+static int                              ofxThreadedVideoGlobalInstanceID = 0;
+//static deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
+//static ofxThreadedVideoCommand          ofxThreadedVideoNullCommand; (declared below)
+
+static int ofxThreadedVideoLoadOk;
+static int ofxThreadedVideoLoadFail;
+
+class ofxThreadedVideo : public ofThread {
+
+public:
+
+    ofxThreadedVideo();
+    ~ofxThreadedVideo();
+    
+    template <typename T>
+    void setPlayer(){
+        video[0].setPlayer(ofPtr<T>(new T));
+        video[1].setPlayer(ofPtr<T>(new T));
+    }
+
+    ofPtr<ofBaseVideoPlayer> getPlayer();
+
+    void loadMovie(string path);
+    void setPixelFormat(ofPixelFormat pixelFormat);
+    ofPixelFormat getPixelFormat();
+    void closeMovie();
+    void close();
+
+    void update();
+    void play();
+    void stop();
+
+    bool isFrameNew();
+    unsigned char * getPixels();
+    ofPixelsRef	getPixelsRef();
+    float getPosition();
+    float getSpeed();
+    float getDuration();
+    bool getIsMovieDone();
+
+    void setPosition(float pct);
+    void setVolume(float volume);
+
+#ifdef USE_QUICKTIME_7
+    float getVolume(); // we should implement for QT6
+    void setPan(float pan);
+    float getPan();
+#endif
+    
+    void setLoopState(ofLoopType state);
+    int getLoopState();
+    void setSpeed(float speed);
+    void setFrame(int frame);
+
+	void setUseBlackStop(bool b);
+    void setUseTexture(bool bUse);
+    ofTexture &	getTextureReference();
+    
+    void draw(float x, float y, float w, float h);
+    void draw(float x, float y);
+    void draw(const ofPoint & p);
+    void draw(const ofRectangle & r);
+    void draw();
+
+    void setAnchorPercent(float xPct, float yPct);
+    void setAnchorPoint(float x, float y);
+    void resetAnchor();
+
+    void setPaused(bool bPause);
+
+    int getCurrentFrame();
+    int getTotalNumFrames();
+
+    void firstFrame();
+    void nextFrame();
+    void previousFrame();
+
+    float getHeight();
+    float getWidth();
+
+    bool isPaused();
+    bool isLoaded();
+    bool isPlaying();
+    bool isLoading();
+    bool isLoading(string path);
+    bool isTextureReady();
+    
+#ifdef USE_JACK_AUDIO
+    vector<string>  getAudioDevices();
+//    int             getAudioTrackList();
+    void            setAudioDevice(int deviceID);
+    void            setAudioDevice(string deviceID);
+    void            setAudioTrackToChannel(int trackIndex, int oldChannelLabel, int newChannelLabel);
+#endif
+    
+    string getMovieName();
+    string getMoviePath();
+
+    double getFrameRate();
+    
+    void setFade(float fadeTarget);
+    void setFade(int frameStart, int durationMillis, float fadeTarget, bool fadeSound = false, bool fadeVideo = true, bool fadeOnce = false);
+    
+    float getFade();
+    void clearFades();
+    
+    ofEvent<ofxThreadedVideoEvent> threadedVideoEvent;
+    string getEventTypeAsString(ofxThreadedVideoEventType eventType);
+    
+    void setVerbose(bool b);
+    
+    void flush();
+    void finish();
+    
+    int getQueueSize();
+    int getLoadOk();
+    int getLoadFail();
+    
+protected:
+
+    void threadedFunction();
+
+    bool getGlobalSafe();
+    void setGlobalSafe();
+    void setGlobalUnSafe();
+    
+    void pushCommand(ofxThreadedVideoCommand& c, bool back = true);
+    ofxThreadedVideoCommand getCommand();
+    void popCommand();
+
+    static const int VIDEO_NONE = -1;
+    static const int VIDEO_FLIP = 0;
+    static const int VIDEO_FLOP = 1;
+
+    int getNextLoadID();
+
+    //--------------------------------------------------------------
+    
+    deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
+    
+    bool bLoaded;
+    bool bCriticalSection;
+    int currentVideoID;
+    
+    ofVideoPlayer video[2];
+    ofPixels * pixels;
+    ofTexture drawTexture;
+    
+	bool bUseBlackStop;
+	bool bForceBlack;
+    bool bUseTexture;
+    bool bIsFrameNew;
+    bool bForceFrameNew;
+    bool bIsPaused;
+    bool bIsPlaying;
+    bool bIsTextureReady;
+    bool bIsLoading;
+    bool bIsMovieDone;
+    
+    float width;
+    float height;
+    
+    float duration;
+    float speed;
+    float position;
+    
+    float volume;
+    float pan;
+    
+    ofLoopType loopState;
+    
+    int frameCurrent;
+    int frameTotal;
+    
+    string movieName;
+    string moviePath;
+
+    float fade;
+    float _fade;
+    deque<ofxThreadedVideoFade> fades;
+    
+    ofPixelFormat internalPixelFormat;
+    
+#ifdef USE_JACK_AUDIO
+    vector<string> audioDevices;
+#endif
+    
+    int instanceID;
+    
+    double prevMillis, lastFrameTime, timeNow, timeThen, fps, frameRate;
+    
+    bool bVerbose;
+    
+private:
+    
+    // block copy ctor and assignment operator
+    ofxThreadedVideo(const ofxThreadedVideo& other);
+    ofxThreadedVideo& operator=(const ofxThreadedVideo&);
+
+};
+
+
+
+
 
 class ofxThreadedVideoEvent{
 

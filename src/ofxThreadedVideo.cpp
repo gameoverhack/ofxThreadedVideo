@@ -31,6 +31,8 @@
 
 #include "ofxThreadedVideo.h"
 
+
+
 //--------------------------------------------------------------
 void ofxThreadedVideo::flush(){
     lock();
@@ -92,6 +94,7 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bCriticalSection = false;
     bLoaded = false;
     
+	bUseBlackStop = bForceBlack = false;
     bUseTexture = true;
     bIsFrameNew = false;
     bIsPlaying = false;
@@ -176,6 +179,11 @@ void ofxThreadedVideo::update(){
                     drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
                 }
                 
+				if(bForceBlack){
+					video[videoID].getPixelsRef().set(0);
+					bForceBlack = bLoaded = false;
+				}
+
                 unsigned char * pixels = video[videoID].getPixels();
                 if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
                 
@@ -232,6 +240,7 @@ void ofxThreadedVideo::update(){
                 bIsFrameNew = false;
                 bIsMovieDone = false;
                 bLoaded = false;
+				if(bUseBlackStop) bForceBlack =bForceFrameNew = bIsFrameNew = bLoaded = true;
                 unlock();
                 bPopCommand = true;
             }
@@ -356,7 +365,7 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].setLoopState(loopState);
                     bPopCommand = true;
                 }
-                
+
 //                if(c.getCommand() == "setSpeed"){
 //                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
 //                    lock();
@@ -564,7 +573,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                 }
             }
-            
+
             ofxThreadedVideoGlobalMutex.lock();
             
             if(bPopCommand) popCommand();
@@ -615,7 +624,7 @@ ofxThreadedVideoCommand ofxThreadedVideo::getCommand(){
 }
 
 //--------------------------------------------------------------
-bool ofxThreadedVideo::loadMovie(string path){
+void ofxThreadedVideo::loadMovie(string path){
     ofxThreadedVideoCommand c("loadMovie", instanceID);
     c.setArgument(path);
     pushCommand(c);
@@ -631,6 +640,11 @@ void ofxThreadedVideo::play(){
 void ofxThreadedVideo::stop(){
     ofxThreadedVideoCommand c("stop", instanceID);
     pushCommand(c);
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo:: setUseBlackStop(bool b){
+	bUseBlackStop = b;
 }
 
 //--------------------------------------------------------------
@@ -716,7 +730,7 @@ void ofxThreadedVideo::clearFades(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFrameNew(){
-    ofScopedLock lock(mutex);
+    //ofScopedLock lock(mutex);
     return bIsFrameNew;
 }
 
