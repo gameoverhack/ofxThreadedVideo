@@ -240,14 +240,17 @@ void ofxThreadedVideo::update(){
                 bIsFrameNew = false;
                 bIsMovieDone = false;
                 bLoaded = false;
-				if(bUseBlackStop) bForceBlack =bForceFrameNew = bIsFrameNew = bLoaded = true;
+				if(bUseBlackStop) bForceBlack = bForceFrameNew = bIsFrameNew = bLoaded = true;
                 unlock();
                 bPopCommand = true;
             }
             
             if(c.getCommand() == "loadMovie" && bCanStop){
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " execute in update";
-                if(bIsPlaying) video[videoID].stop();
+                if(bIsPlaying){
+                    video[videoID].stop();
+                    video[videoID].close();
+                }
                 lock();
                 currentVideoID = getNextLoadID();
                 bIsPaused = false;
@@ -256,6 +259,18 @@ void ofxThreadedVideo::update(){
                 bIsPlaying = false;
                 bIsMovieDone = false;
                 unlock();
+            }
+            
+            if(c.getCommand() == "play"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                video[videoID].play();
+                
+                lock();
+                bIsPlaying = true;
+                bIsPaused = false;
+                unlock();
+                
+                bPopCommand = true;
             }
             
             if(c.getCommand() == "setSpeed"){
@@ -316,17 +331,17 @@ void ofxThreadedVideo::threadedFunction(){
             
             if(c.getInstance() == instanceID){
                 
-                if(c.getCommand() == "play"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    video[videoID].play();
-                    
-                    lock();
-                    bIsPlaying = true;
-                    bIsPaused = false;
-                    unlock();
-                    
-                    bPopCommand = true;
-                }
+//                if(c.getCommand() == "play"){
+//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+//                    video[videoID].play();
+//                    
+//                    lock();
+//                    bIsPlaying = true;
+//                    bIsPaused = false;
+//                    unlock();
+//                    
+//                    bPopCommand = true;
+//                }
                 
                 if(c.getCommand() == "setPosition"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
@@ -446,9 +461,17 @@ void ofxThreadedVideo::threadedFunction(){
                     
                     if(frameStart == frameEnd){
                         _fade = fadeTarget;
-                        if(fadeVideo) fade = _fade;
                         lock();
-                        if(fadeSound) video[videoID].setVolume(_fade);
+                        if(fadeVideo) fade = _fade;
+                        unlock();
+                        
+                        lock();
+                        if(fadeSound){
+                            volume = _fade;
+                            unlock();
+                            video[videoID].setVolume(_fade);
+                            lock();
+                        }
                         unlock();
                     }else{
                         frameEnd -= 1;
@@ -457,7 +480,9 @@ void ofxThreadedVideo::threadedFunction(){
                         assert(frameEnd >= frameStart);
                         assert(frameEnd <= frameTotal);
                         
+                        lock();
                         fades.push_back(ofxThreadedVideoFade(frameStart, frameEnd, fadeTarget, fadeSound, fadeVideo, fadeOnce));
+                        unlock();
                     }
                     
 
@@ -480,13 +505,14 @@ void ofxThreadedVideo::threadedFunction(){
 #endif
                 
                 if(c.getCommand() == "loadMovie" && bCanLoad){
+                    
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     
                     if(video[videoID].loadMovie(c.getArgument<string>(0))){
                         
                         if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " executed in thread";;
 
-//                        lock();
+                        lock();
                         
                         fades.clear();
                         width = video[videoID].getWidth();
@@ -523,7 +549,7 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         bPopCommand = true;
                         
-                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_OK, this);
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(c.getArgument<string>(0), VIDEO_EVENT_LOAD_OK, this);
                         ofNotifyEvent(threadedVideoEvent, e, this);
                         
                         ofxThreadedVideoLoadOk++;
@@ -532,7 +558,9 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         ofLogError() << "Could not load: " << instanceID << " + " << c.getCommandAsString();
                         
-                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_FAIL, this);
+                        video[videoID].close();
+                        
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(c.getArgument<string>(0), VIDEO_EVENT_LOAD_FAIL, this);
                         ofNotifyEvent(threadedVideoEvent, e, this);
                         
                         ofxThreadedVideoLoadFail++;
@@ -542,9 +570,7 @@ void ofxThreadedVideo::threadedFunction(){
                 
             }
             
-            if(bPopCommand){
-                video[videoID].update();
-            }
+            if(bPopCommand) video[videoID].update();
         
             lock();
             
