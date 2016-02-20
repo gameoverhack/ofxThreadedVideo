@@ -176,7 +176,7 @@ void ofxThreadedVideo::update(){
                 if(!bIsTextureReady) bIsTextureReady = true;
                 
                 if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
-                    drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+                    drawTexture.allocate(width, height, ofGetGLFormatFromPixelFormat(video[videoID].getPixelFormat()));
                 }
                 
 				if(bForceBlack){
@@ -185,7 +185,7 @@ void ofxThreadedVideo::update(){
 				}
 
                 unsigned char * pixels = video[videoID].getPixels();
-                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLFormatFromPixelFormat(video[videoID].getPixelFormat()));
                 
                 if(bForceFrameNew){
                     bForceFrameNew = false;
@@ -613,7 +613,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
         }
         
-        ofSleepMillis(1);
+        ofSleepMillis(1000.0/25.0);
 
     }
         
