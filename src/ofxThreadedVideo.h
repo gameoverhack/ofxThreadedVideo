@@ -200,8 +200,6 @@ static ofxThreadedVideoCommand ofxThreadedVideoNullCommand;
 static ofMutex                          ofxThreadedVideoGlobalMutex;
 static bool                             ofxThreadedVideoGlobalCritical = false;
 static int                              ofxThreadedVideoGlobalInstanceID = 0;
-//static deque<ofxThreadedVideoCommand>   ofxThreadedVideoCommands;
-//static ofxThreadedVideoCommand          ofxThreadedVideoNullCommand; (declared below)
 
 static int ofxThreadedVideoLoadOk;
 static int ofxThreadedVideoLoadFail;
@@ -346,6 +344,9 @@ protected:
     ofVideoPlayer video[2];
     ofPixels * pixels;
     ofTexture drawTexture;
+    int textureInternalType;
+    int textureFormatType;
+    int texturePixelType;
     
 	bool bUseBlackStop;
 	bool bForceBlack;

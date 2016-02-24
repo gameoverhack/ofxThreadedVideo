@@ -130,7 +130,7 @@ ofxThreadedVideo::ofxThreadedVideo(){
     bVerbose = false;
     
     // let's go!
-    startThread();
+    startThread(true);
 }
 
 //--------------------------------------------------------------
@@ -176,7 +176,57 @@ void ofxThreadedVideo::update(){
                 if(!bIsTextureReady) bIsTextureReady = true;
                 
                 if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
-                    drawTexture.allocate(width, height, ofGetGLFormatFromPixelFormat(video[videoID].getPixelFormat()));
+                    
+                    ofTextureData texData;
+                    
+                    texData.width = width;
+                    texData.height = height;
+                    texData.textureTarget = GL_TEXTURE_2D;
+  
+                    switch (internalPixelFormat) {
+                        case OF_PIXELS_RGB:
+                            textureInternalType = GL_RGB;
+                            textureFormatType = GL_RGB;
+                            texturePixelType = GL_UNSIGNED_BYTE;
+                            break;
+                        case OF_PIXELS_RGBA:
+                            textureInternalType = GL_RGBA;
+                            textureFormatType = GL_RGBA;
+                            texturePixelType = GL_UNSIGNED_BYTE;
+                            break;
+                        case OF_PIXELS_BGRA:
+                            textureInternalType = GL_RGBA;
+                            textureFormatType = GL_BGRA;
+                            texturePixelType = GL_UNSIGNED_INT_8_8_8_8_REV;
+                            break;
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+                        case OF_PIXELS_2YUV:
+#else
+                        case OF_PIXELS_YUY2:
+#endif
+                            textureInternalType = GL_RGB;
+                            textureFormatType = GL_RGB_422_APPLE;
+                            texturePixelType = GL_UNSIGNED_SHORT_8_8_APPLE;
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                    
+                    
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+                    texData.glTypeInternal = textureInternalType;
+//                    texData.glType = textureFormatType;
+//                    texData.pixelType = texturePixelType;
+#else
+                    texData.glInternalFormat = textureInternalType;
+#endif
+                    drawTexture.allocate(texData, textureFormatType, texturePixelType);
+#if defined(TARGET_OSX)
+                    drawTexture.bind();
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_STORAGE_HINT_APPLE , GL_STORAGE_SHARED_APPLE);
+                    drawTexture.unbind();
+#endif
                 }
                 
 				if(bForceBlack){
@@ -185,7 +235,7 @@ void ofxThreadedVideo::update(){
 				}
 
                 unsigned char * pixels = video[videoID].getPixels();
-                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLFormatFromPixelFormat(video[videoID].getPixelFormat()));
+                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, textureFormatType, texturePixelType);
                 
                 if(bForceFrameNew){
                     bForceFrameNew = false;
@@ -331,18 +381,6 @@ void ofxThreadedVideo::threadedFunction(){
             
             if(c.getInstance() == instanceID){
                 
-//                if(c.getCommand() == "play"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    video[videoID].play();
-//                    
-//                    lock();
-//                    bIsPlaying = true;
-//                    bIsPaused = false;
-//                    unlock();
-//                    
-//                    bPopCommand = true;
-//                }
-                
                 if(c.getCommand() == "setPosition"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
@@ -380,37 +418,6 @@ void ofxThreadedVideo::threadedFunction(){
                     video[videoID].setLoopState(loopState);
                     bPopCommand = true;
                 }
-
-//                if(c.getCommand() == "setSpeed"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    lock();
-//                    speed = c.getArgument<float>(0);
-//                    unlock();
-//                    video[videoID].setSpeed(speed);
-//                    bPopCommand = true;
-//                }
-                
-//                if(c.getCommand() == "setFrame"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    int frameTarget = c.getArgument<int>(0);
-//                    CLAMP(frameTarget, 0, frameTotal);
-//                    video[videoID].setFrame(frameTarget);
-//                    bForceFrameNew = true;
-//                    bPopCommand = true;
-//                }
-                
-//                if(c.getCommand() == "setFrame"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    lock();
-//                    int frameTarget = c.getArgument<int>(0);
-//                    bForceFrameNew = true;
-//                    frameTarget = CLAMP(frameTarget, 0, frameTotal);
-//                    cout << "setframe A: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
-//                    video[videoID].setFrame(frameTarget);
-//                    cout << "setframe B: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
-//                    unlock();
-//                    bPopCommand = true;
-//                }
                 
                 if(c.getCommand() == "setPaused"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
