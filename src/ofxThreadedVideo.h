@@ -44,6 +44,9 @@
 
 #else
 
+//#define USE_QUICKTIME_7
+//#define USE_JACK_AUDIO
+
 #include "ofQtUtils.h"
 #include "ofQuickTimePlayer.h"
 
@@ -142,8 +145,39 @@ protected:
     
 };
 
-//#define USE_QUICKTIME_7
-//#define USE_JACK_AUDIO
+// YUV2 shader modified from: http://www.fourcc.org/fccyvrgb.php and http://www.fourcc.org/source/YUV420P-OpenGL-GLSLang.c
+const string ofxThreadedVideoVertexShader = "void main(void){\
+gl_TexCoord[0] = gl_MultiTexCoord0;\
+gl_TexCoord[1] = gl_MultiTexCoord0 + vec4(1,0,0,0);\
+gl_Position = ftransform();\
+}";
+
+const string ofxThreadedVideoFragmentShader = "uniform sampler2DRect yuvTex;\
+uniform int conversionType;\
+uniform float fade;\
+void main(void){\
+float nx, ny, r, g, b, a, y, u, v;\
+vec4 txl,ux,vx;\
+nx = gl_TexCoord[0].x;\
+ny = gl_TexCoord[0].y;\
+y = texture2DRect(yuvTex, vec2(nx,ny)).g;\
+u = texture2DRect(yuvTex, vec2(nx,ny)).b;\
+v = texture2DRect(yuvTex, vec2(nx,ny)).r;\
+y = 1.164383561643836 * (y - 0.0625);\
+u = u - 0.5;\
+v = v - 0.5;\
+float kb = 0.114;\
+float kr = 0.299;\
+float c = 2.276785714285714;\
+if(conversionType == 709){\
+kb = 0.0722;\
+kr = 0.2126;\
+}\
+r = y + c * (1.0 - kr) * v;\
+g = y - c * (1.0 - kb) * (kb / (1.0 - kb - kr)) * u - c * (1.0 - kr) * (kr / (1.0 - kb - kr)) * v;\
+b = y + c * (1.0 - kb) * u;\
+gl_FragColor = vec4(r * fade, g * fade, b * fade, 1.0 * fade);\
+}";
 
 enum ofxThreadedVideoEventType{
     VIDEO_EVENT_LOAD_OK = 0,
@@ -322,7 +356,8 @@ public:
 
     ofPtr<ofBaseVideoPlayer> getPlayer();
 
-    void loadMovie(string path);
+    void load(const string& path);
+    void loadMovie(const string& path);
     void setPixelFormat(ofPixelFormat pixelFormat);
     ofPixelFormat getPixelFormat();
     void closeMovie();
@@ -332,6 +367,10 @@ public:
     void play();
     void stop();
 
+    ofShader& getShader();
+    void setUseInternalShader(bool b);
+    bool getUseInternalShader();
+    
     bool isFrameNew();
     unsigned char * getPixels();
     ofPixelsRef	getPixelsRef();
@@ -447,6 +486,11 @@ protected:
     ofVideoPlayer video[2];
     ofPixels * pixels;
     ofTexture drawTexture;
+    
+    ofFbo fboYUY2;
+    ofShader shader;
+    bool bUseInternalShader;
+    
     int textureInternalType;
     int textureFormatType;
     int texturePixelType;

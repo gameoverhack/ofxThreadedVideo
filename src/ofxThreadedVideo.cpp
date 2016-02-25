@@ -80,6 +80,8 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     setPixelFormat(OF_PIXELS_RGB);
     
+    bUseInternalShader = false;
+    
     drawTexture.allocate(1, 1, GL_RGB);
     ofPixels p;
     p.allocate(1, 1, OF_IMAGE_COLOR);
@@ -205,6 +207,7 @@ void ofxThreadedVideo::update(){
 #else
                         case OF_PIXELS_YUY2:
 #endif
+                            if(bUseInternalShader) fboYUY2.allocate(width, height);
                             textureInternalType = GL_RGB;
                             textureFormatType = GL_RGB_422_APPLE;
                             texturePixelType = GL_UNSIGNED_SHORT_8_8_APPLE;
@@ -659,10 +662,15 @@ ofxThreadedVideoCommand ofxThreadedVideo::getCommand(){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::loadMovie(string path){
+void ofxThreadedVideo::load(const string& path){
     ofxThreadedVideoCommand c("loadMovie", instanceID);
     c.setArgument(path);
     pushCommand(c);
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::loadMovie(const string& path){
+    load(path);
 }
 
 //--------------------------------------------------------------
@@ -887,9 +895,52 @@ ofPixelsRef ofxThreadedVideo::getPixelsRef(){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
+ofShader& ofxThreadedVideo::getShader(){
+    return shader;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setUseInternalShader(bool b){
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+    if(internalPixelFormat == OF_PIXELS_2YUV){
+#else
+    if(internalPixelFormat == OF_PIXELS_YUY2){
+#endif
+        bUseInternalShader = b;
+    }else{
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+        if(b) ofLogWarning() << "You need to be using OF_PIXELS_2YUV for the internal shader to be relevant";
+#else
+        if(b) ofLogWarning() << "You need to be using OF_PIXELS_YUY2 for the internal shader to be relevant";
+#endif
+        bUseInternalShader = false;
+    }
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::getUseInternalShader(){
+    return bUseInternalShader;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setPixelFormat(ofPixelFormat pixelFormat){
     ofScopedLock lock(mutex);
-    internalPixelFormat = _pixelFormat;
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+    if(pixelFormat == OF_PIXELS_2YUV){
+#else
+    if(pixelFormat == OF_PIXELS_YUY2){
+#endif
+        bool ok = shader.setupShaderFromSource(GL_VERTEX_SHADER, ofxThreadedVideoVertexShader);
+        if(ok) ok = shader.setupShaderFromSource(GL_FRAGMENT_SHADER, ofxThreadedVideoFragmentShader);
+        if(ok) ok = shader.linkProgram();
+        if(!ok){
+            ofLogError() << "Could not initialize shader - reverting to default pixel format";
+            pixelFormat = internalPixelFormat;
+        }
+        bUseInternalShader = true;
+    }
+    
+    internalPixelFormat = pixelFormat;
     video[0].setPixelFormat(internalPixelFormat);
     video[1].setPixelFormat(internalPixelFormat);
 }
@@ -908,8 +959,29 @@ ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
     ofPushStyle();
-    ofSetColor(255 * fade, 255 * fade, 255 * fade, 255 * fade);
-    drawTexture.draw(x, y, w, h);
+    
+    if(bUseInternalShader && fboYUY2.isAllocated()){
+        
+        if(isFrameNew()){
+            fboYUY2.begin();
+            ofClear(0, 0, 0, 1);
+            drawTexture.draw(x, y, w, h);
+            fboYUY2.end();
+        }
+
+        shader.begin();
+        shader.setUniformTexture("yuvTex", fboYUY2.getTexture(), 1);
+        shader.setUniform1i("conversionType", (false ? 709 : 601));
+        shader.setUniform1f("fade", getFade());
+        fboYUY2.draw(x, y, w, h);
+        shader.end();
+        
+    }else{
+        
+        ofSetColor(255 * fade, 255 * fade, 255 * fade, 255 * fade);
+        drawTexture.draw(x, y, w, h);
+        
+    }
     ofPopStyle();
 }
 

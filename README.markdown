@@ -1,21 +1,17 @@
 OFXTHREADED VIDEO
 =================
 
-ofxThreaded video does two things let's you load video's of any size without blocking the main application thread. As a side product this also tends to improve performance for some codecs. The best ones are JPEG 50-60% or ANIMATION 50-60%. It's been tested on OSX (10.6,7,8) and Windows 7.
+ofxThreaded video implements an asynchronous, non-blocking API for ALL critical Quicktime API calls. This results in TOTALLY NON-BLOCKING load, seek, pause, play etc. It also greatly improves video playback efficiency especially if you use OF_PIXEL_BGRA or OF_PIXEL_YUY2 pixel formats with the following codecs: ANIMATION 50-60% (using OF_PIXELS_BGRA on <= 10.8), or JPEG 50-60% and PRORES422 50-60% (using OF_PIXELS_YUY2 on >= 10.8).
 
-I get around 8 HD 1920 x 1080 movies running smoothly on a late model rMBP.
+I get around 8+ HD 1920 x 1080 movies running smoothly on a late model rMBP.
 
-Please note that this version is based on Quicktime 6 or 7 (ie., the 10.6 SDK) so you will need to install a copy of that and compile your projects (and oF) against 10.6 if you are using 10.7 or 10.8 on your dev machine (I'm working on a QTKit version at the moment…).
+LATEST VERSION WORKS ON 10.8+ and of009x!! You just need to compile your application as 32bit (OpenFrameworks can remain Universal 32/64bit). AWESOMENESS.
 
-If you are on 10.7 or 10.8 this is a good reference for how to compile against the 'deprecated' SDK: http://forum.openframeworks.cc/index.php/topic,10343.msg47100.html#msg47100
-
-And you will need a:
-
-```
-#define OF_VIDEO_PLAYER_QUICKTIME
-```
-
-Before you include "ofMain.h" in your header file.
+Changes:
+* Updated to work with of009x (if you want the legacy version for some reason it's in the 'legacy' branch of this repo)
+* Now works in 10.6, 10.7, 10.8 (and presumably 10.9 + 10.10 though needs testing) without modifying openFrameworks or compiling against 10.6 SDK
+* Improved stability under heavy loads and setFrame/setPause (tested 1 million+ without crash)
+* Can use optimised BGRA and YUY2 pixel formats (with JPEG and ProRes codecs) - including built in YUY2 -> RGB/A shader
 
 Please also note that you will need to comment out:
 
@@ -24,15 +20,5 @@ Please also note that you will need to comment out:
 #define USE_JACK_AUDIO
 ```
 
-in the header file if they are not already commented out (sorry I keep forgetting to comment these out when I push changes so best to just make it default user action).
+if I've forgotten to do so (these options are specific to some of my needs and occasionally I forget to comment them out when pushing to git).
 
-
-Since it is non-blocking, or asynchronous ofxThreadedVideo cannot always be used as a direct drop-in for an ofVideoPlayer - but this version is closer to that. Previously you had to wait until a video was fully loaded before issuing any other commands that manipulated or queried the video. This version implements a new queueing system that allows all 'set' commands to be issued as though the video were a normal 'blocking' ofVideoPlayer. However any 'get' method must (for obvious reasons) wait until the video is loaded (this can be achieved by watching the isLoaded() method, or using the built in event model). So as long as your code only uses setFrame, setVolume, setLoopState, etc you can just make calls as though it were a synchronous object - but if you need to call a get function (e.g.., getFrame, getVolume) you must check that the video is loaded.
-
-Please also note that the queue is designed to handle an <irony>UNREASONABLE</irony> user request scenario without rejecting any requests. Eg., if you ask an instance (or several instances) of ofxThreadedVideo to load, let's say, 100,000 videos it will swallow the request and then proceed to execute it as fast as possible (roughly 1 load per 80-150ms depending on the system). Less 'expensive' calls such as setVolume, setFrame, play, stop, pause etc execute faster than this (but importantly not immediately). The thing is designed for efficiency and non-blockingness, not 'accuracy' or 'immediacy' per se.
-
-This is because the overall design is actually a serial queue because Quicktime is by (unfortunate) design non-thread safe for many operations - specifically any playing, pausing, seeking, etc parts of the API. ofxThreadedVideo gets around this by using a series of local and global mutexes to ensure that both single and multiple threaded instances never (EVER) call a Quicktime command at exactly the same time. Instead it schedules every call to occur on the next 'tick' so to speak.
-
-This new method is NEW - so expect some bugs. BUT it is both much more efficient and truly block free compared to the previous incarnation.
-
-I've updated the examples to demo the queueing - try out making the load interval very small and you will see your machine make <irony>UNREASONABLE</irony> requests to ofxThreadedVideo. When you back off the interval it will continue to process the queue as fast as your hardware can load!
