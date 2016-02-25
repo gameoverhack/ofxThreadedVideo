@@ -965,7 +965,7 @@ void ofxThreadedVideo::draw(float x, float y, float w, float h){
         if(isFrameNew()){
             fboYUY2.begin();
             ofClear(0, 0, 0, 1);
-            drawTexture.draw(x, y, w, h);
+            drawTexture.draw(0, 0, w, h);
             fboYUY2.end();
         }
 
