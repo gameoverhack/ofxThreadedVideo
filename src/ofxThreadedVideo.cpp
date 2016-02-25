@@ -1,7 +1,7 @@
 /*
  * ofxThreadedVideo.cpp
  *
- * Copyright 2010-2013 (c) Matthew Gingold http://gingold.com.au
+ * Copyright 2010-2016 (c) Matthew Gingold http://gingold.com.au
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
