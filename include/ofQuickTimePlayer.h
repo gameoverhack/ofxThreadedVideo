@@ -3,8 +3,9 @@
 #include "ofConstants.h"
 #include "ofBaseTypes.h"
 #include "ofPixels.h"
-
-#include "ofQtUtils.h"
+#define OF_VIDEO_PLAYER_QUICKTIME
+#ifdef OF_VIDEO_PLAYER_QUICKTIME
+	#include "ofQtUtils.h"
 
 class ofQuickTimePlayer : public ofBaseVideoPlayer{
 
@@ -60,14 +61,18 @@ class ofQuickTimePlayer : public ofBaseVideoPlayer{
 		 
 		 mutable bool	bHavePixelsChanged;
 		 
+		 
+		
 	protected:
-    
-		void createImgMemAndGWorld();
+		virtual void createImgMemAndGWorld();
 		void start();
 
 		ofPixels		 	pixels;
 		int					width, height;
 		bool				bLoaded;
+
+		//these are public because the ofQuickTimePlayer implementation has some callback functions that need access
+		//todo - fix this
 
 		int					nFrames;				// number of frames
 		bool				allocated;				// so we know to free pixels or not
@@ -86,11 +91,9 @@ class ofQuickTimePlayer : public ofBaseVideoPlayer{
 		unsigned char * 	offscreenGWorldPixels;	// 32 bit: argb (qt k32ARGBPixelFormat)
 		void				qtGetFrameCount(Movie & movForcount);
 
-        ofPixelFormat       internalPixelFormat;
-    
 };
 
-
+#endif
 
 
 

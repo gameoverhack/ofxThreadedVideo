@@ -37,7 +37,115 @@
 #include <assert.h>
 
 #include "ofMain.h"
+
+#if __LP64__
+
+#error ofxThreadedVideo support requires 32-bit QuickTime APIs but this target is 64-bit
+
+#else
+
+#include "ofQtUtils.h"
 #include "ofQuickTimePlayer.h"
+
+// class implimentation overrides how ofQuicktimePlayer implements pixel
+// decoding and allows setPixels for RGB, RGBA, BGRA and YUY2 pixel formats
+class ofQuickTimePlayerWithFastPixels: public ofQuickTimePlayer{
+    
+public:
+    
+void createImgMemAndGWorld(){
+    
+    Rect movieRect;
+    movieRect.top 			= 0;
+    movieRect.left 			= 0;
+    movieRect.bottom 		= height;
+    movieRect.right 		= width;
+    
+    switch(internalPixelFormat){
+            
+        case OF_PIXELS_RGB:
+        {
+            offscreenGWorldPixels = new unsigned char[3 * width * height + 24];
+            pixels.allocate(width, height, OF_PIXELS_RGB);
+            QTNewGWorldFromPtr (&(offscreenGWorld), k24RGBPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 3 * width);
+            break;
+        }
+        case OF_PIXELS_RGBA:
+        {
+            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
+            pixels.allocate(width, height, OF_PIXELS_RGBA);
+            QTNewGWorldFromPtr (&(offscreenGWorld), k32RGBAPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
+            break;
+        }
+        case OF_PIXELS_BGRA:
+        {
+            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
+            pixels.allocate(width, height, OF_PIXELS_BGRA);
+            QTNewGWorldFromPtr (&(offscreenGWorld), k32BGRAPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
+            break;
+        }
+        case OF_PIXELS_YUY2:
+        {
+#if !defined (TARGET_OSX) && !defined (GL_APPLE_rgb_422)
+            movieRect.top 			= 0;
+            movieRect.left 			= 0;
+            movieRect.bottom 		= height;
+            movieRect.right 		= width*2; // this makes it look correct but we lose some of the performance gains
+            SetMovieBox(moviePtr, &(movieRect));
+            //width = width / 2; // this makes it go really fast but we only get 'half-resolution'...
+            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
+            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
+            QTNewGWorldFromPtr (&(offscreenGWorld), k24RGBPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
+#else
+            
+            // for some reason doesn't like non-even width's and height's
+            if(width % 2 != 0) width++;
+            if(height % 2 != 0) height++;
+            movieRect.top 			= 0;
+            movieRect.left 			= 0;
+            movieRect.bottom 		= height;
+            movieRect.right 		= width;
+            
+            // this works perfectly on Mac platform!
+            offscreenGWorldPixels = new unsigned char[2 * width * height + 32];
+            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
+            QTNewGWorldFromPtr (&(offscreenGWorld), k2vuyPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 2 * width);
+#endif
+            
+            break;
+        }
+    }
+    
+    LockPixels(GetGWorldPixMap(offscreenGWorld));
+    
+    // from : https://github.com/openframeworks/openFrameworks/issues/244
+    // SetGWorld do not seems to be necessary for offscreen rendering of the movie
+    // only SetMovieGWorld should be called
+    // if both are called, the app will crash after a few ofVideoPlayer object have been deleted
+    
+#ifndef TARGET_WIN32
+    SetGWorld (offscreenGWorld, NULL);
+#endif
+    SetMovieGWorld (moviePtr, offscreenGWorld, nil);
+    
+}
+    
+//---------------------------------------------------------------------------
+bool setPixelFormat(ofPixelFormat pixelFormat){
+    //note as we only support RGB we are just confirming that this pixel format is supported
+    if( pixelFormat == OF_PIXELS_RGB || pixelFormat == OF_PIXELS_RGBA || pixelFormat == OF_PIXELS_BGRA || pixelFormat == OF_PIXELS_YUY2){
+        internalPixelFormat = pixelFormat;
+        return true;
+    }
+    ofLogWarning("ofQuickTimePlayer") << "setPixelFormat(): requested pixel format " << pixelFormat << " not supported";
+    return false;
+}
+    
+protected:
+    
+    int internalPixelFormat;
+    
+};
 
 //#define USE_QUICKTIME_7
 //#define USE_JACK_AUDIO
@@ -425,5 +533,7 @@ inline ostream& operator<<(ostream& os, const ofxThreadedVideoEvent &e){
     os << e.eventTypeAsString << " " << e.path;
     return os;
 };
+
+#endif
 
 #endif

@@ -1,25 +1,50 @@
 #pragma once
 
 #include "ofConstants.h"
+#define OF_VIDEO_PLAYER_QUICKTIME
+#if __LP64__ && (defined(OF_VIDEO_CAPTURE_QUICKTIME) || defined(OF_VIDEO_PLAYER_QUICKTIME))
+
+#error QuickTime support requires 32-bit QuickTime APIs but this target is 64-bit
+
+#elif defined(OF_VIDEO_CAPTURE_QUICKTIME) || defined(OF_VIDEO_PLAYER_QUICKTIME)
 
 #if defined (TARGET_WIN32) || defined (TARGET_OSX)
-
-
-
-#ifdef TARGET_OSX
-	#include <QuickTime/QuickTime.h>
-	#include <CoreServices/CoreServices.h>
-	#include <ApplicationServices/ApplicationServices.h>
-#else
+// these 'hacks' for using Quicktime under 10.7+ taken from the ingenius idea at https://github.com/bangnoise/ofxHapPlayer
+#if defined(TARGET_WIN32)
 	#include <QTML.h>
 	#include <FixMath.h>
 	#include <QuickTimeComponents.h>
 	#include <TextUtils.h>
 	#include <MediaHandlers.h>
-	//#include <MoviesFormat.h>
+#elif defined(TARGET_OSX)
+	#include <QuickTime/QuickTime.h>
+	#include <CoreServices/CoreServices.h>
+	#include <ApplicationServices/ApplicationServices.h>
 #endif
-
-//#ifndef MAC_OS_X_VERSION_10_7
+/*
+ Much of QuickTime is deprecated in recent MacOS but no equivalent functionality exists in modern APIs,
+ so we ignore these warnings.
+ */
+#pragma GCC push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+/*
+ These functions have been excised from modern MacOS headers but remain available
+ */
+#if !defined(__QDOFFSCREEN__)
+extern "C" {
+	void DisposeGWorld(GWorldPtr offscreenGWorld);
+	void GetGWorld(CGrafPtr *port, GDHandle *gdh);
+	PixMapHandle GetGWorldPixMap(GWorldPtr offscreenGWorld);
+	void SetGWorld(CGrafPtr port, GDHandle gdh);
+	Boolean LockPixels(PixMapHandle pm);
+	void UnlockPixels(PixMapHandle pm);
+	
+	enum {
+		useTempMem = 1L << 2,
+		keepLocal = 1L << 3
+	};
+}
+#endif
 
 //p2cstr depreciation fix - thanks pickard!
 #ifdef TARGET_OSX
@@ -53,6 +78,6 @@ void            MovieGetStaticFrameRate(Movie inMovie, double *outStaticFrameRat
 	OSErr	SaveSettingsPreference(CFStringRef inKey, UserData inUserData);
 #endif
 
-//#endif //OS 10.7 guard
+#endif
 
 #endif

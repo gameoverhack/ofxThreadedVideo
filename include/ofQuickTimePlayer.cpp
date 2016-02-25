@@ -2,41 +2,8 @@
 #include "ofUtils.h"
 
 #ifndef TARGET_LINUX
-#define OF_VIDEO_PLAYER_QUICKTIME
-#if defined(TARGET_WIN32)
-#include <QTML.h>
-#include <Movies.h>
-#include <FixMath.h>
-#define ofxHapPlayerFloatToFixed(x) X2Fix(x)
-#elif defined(TARGET_OSX)
-#include <QuickTime/QuickTime.h>
+#ifdef  OF_VIDEO_PLAYER_QUICKTIME
 
-/*
- Much of QuickTime is deprecated in recent MacOS but no equivalent functionality exists in modern APIs,
- so we ignore these warnings.
- */
-#pragma GCC push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-/*
- These functions have been excised from modern MacOS headers but remain available
- */
-#if !defined(__QDOFFSCREEN__)
-extern "C" {
-    void DisposeGWorld(GWorldPtr offscreenGWorld);
-    void GetGWorld(CGrafPtr *port, GDHandle *gdh);
-    PixMapHandle GetGWorldPixMap(GWorldPtr offscreenGWorld);
-    void SetGWorld(CGrafPtr port, GDHandle gdh);
-    Boolean LockPixels(PixMapHandle pm);
-    void UnlockPixels(PixMapHandle pm);
-    
-    enum {
-        useTempMem = 1L << 2,
-        keepLocal = 1L << 3
-    };
-}
-#endif
-
-#endif
 bool  	createMovieFromPath(char * path, Movie &movie);
 bool 	createMovieFromPath(char * path, Movie &movie){
 
@@ -268,119 +235,31 @@ void ofQuickTimePlayer::closeMovie(){
 //--------------------------------------
 
 void ofQuickTimePlayer::createImgMemAndGWorld(){
-
-    Rect movieRect;
+	Rect movieRect;
 	movieRect.top 			= 0;
 	movieRect.left 			= 0;
 	movieRect.bottom 		= height;
 	movieRect.right 		= width;
-    
-    switch(internalPixelFormat){
-//        case OF_PIXELS_MONO:
-//        {
-//            offscreenGWorldPixels = new unsigned char[1 * width * height + 8];
-//            pixels.allocate(width, height, OF_IMAGE_GRAYSCALE);
-//            // For k8IndexedGrayPixelFormat quicktime uses a reversed black and white color table ie., black for white, and
-//            // white for black...rather than reverse every frame after decompression we can provide a custom color table
-//            // thanks to the unwieldy and ancient: http://www.cs.cmu.edu/afs/cs/project/cmcl/link.iwarp/member/OldFiles/tomstr/Mac2/Michigan/mac.bin/hypercard/xcmd/TIFFWindow%20:c4/tiffinfo.c
-//            
-//            // make a new color table
-//            CTabHandle grayCTab = (CTabHandle) NewHandle((256 * sizeof(ColorSpec)) + 10);
-//            (*grayCTab)->ctSeed = GetCTSeed();
-//            (*grayCTab)->ctFlags = 0;
-//            (*grayCTab)->ctSize = 255;
-//            RGBColor rgb;
-//            // invert the default color table
-//            for(int i = 0; i < 256; i++){
-//                rgb.red = rgb.green = rgb.blue = (65535 / (255)) * i;
-//                (*grayCTab)->ctTable[i].value = i; /* this must be filled in... */
-//                (*grayCTab)->ctTable[i].rgb = rgb;
-//            }
-//            QTNewGWorldFromPtr (&(offscreenGWorld), k8IndexedPixelFormat, &(movieRect), grayCTab, NULL, 0, (pixels.getPixels()), 1 * width);
-//            DisposeCTable(grayCTab);
-//            break;
-//        }
-        case OF_PIXELS_RGB:
-        {
-            offscreenGWorldPixels = new unsigned char[3 * width * height + 24];
-            pixels.allocate(width, height, OF_PIXELS_RGB);
-            QTNewGWorldFromPtr (&(offscreenGWorld), k24RGBPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 3 * width);
-            break;
-        }
-        case OF_PIXELS_RGBA:
-        {
-            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
-            pixels.allocate(width, height, OF_PIXELS_RGBA);
-            QTNewGWorldFromPtr (&(offscreenGWorld), k32RGBAPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
-            break;
-        }
-        case OF_PIXELS_BGRA:
-        {
-            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
-            pixels.allocate(width, height, OF_PIXELS_BGRA);
-            QTNewGWorldFromPtr (&(offscreenGWorld), k32BGRAPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
-            break;
-        }
-            //        case OF_PIXELS_ABGR:
-            //        {
-            //            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
-            //            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
-            //            QTNewGWorldFromPtr (&(offscreenGWorld), k32ABGRPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
-            //            break;
-            //        }
-            //        case OF_PIXELS_ARGB:
-            //        {
-            //            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
-            //            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
-            //            QTNewGWorldFromPtr (&(offscreenGWorld), k32ARGBPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
-            //            break;
-            //        }
-        case OF_PIXELS_YUY2:
-        {
-#if !defined (TARGET_OSX) && !defined (GL_APPLE_rgb_422)
-            MacSetRect(&movieRect, 0, 0, width*2, height); // this makes it look correct but we lose some of the performance gains
-            SetMovieBox(moviePtr, &(movieRect));
-            //width = width / 2; // this makes it go really fast but we only get 'half-resolution'...
-            offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
-            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
-            QTNewGWorldFromPtr (&(offscreenGWorld), k24RGBPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 4 * width);
-#else
-            
-            // for some reason doesn't like non-even width's and height's
-            if(width % 2 != 0) width++;
-            if(height % 2 != 0) height++;
-            movieRect.top 			= 0;
-            movieRect.left 			= 0;
-            movieRect.bottom 		= height;
-            movieRect.right 		= width;
-            
-            // this works perfectly on Mac platform!
-            offscreenGWorldPixels = new unsigned char[2 * width * height + 32];
-            pixels.allocate(width, height, OF_IMAGE_COLOR_ALPHA);
-            QTNewGWorldFromPtr (&(offscreenGWorld), k2vuyPixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 2 * width);
-#endif
-            
-            break;
-        }
-            //        case OF_PIXELS_RGB565:
-            //        {
-            //            offscreenGWorldPixels = new unsigned char[3 * width * height + 16];
-            //            pixels.allocate(width, height, OF_IMAGE_COLOR);
-            //            QTNewGWorldFromPtr (&(offscreenGWorld), k16BE565PixelFormat, &(movieRect), NULL, NULL, 0, (pixels.getPixels()), 3 * width);
-            //            break;
-            //        }
-    }
-    
+	offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
+	allocated				= true;
+	pixels.allocate(width,height,OF_IMAGE_COLOR);
+
+	#if defined(TARGET_OSX) && defined(__BIG_ENDIAN__)
+		QTNewGWorldFromPtr (&(offscreenGWorld), k32ARGBPixelFormat, &(movieRect), nullptr, nullptr, 0, (offscreenGWorldPixels), 4 * width);
+	#else
+		QTNewGWorldFromPtr (&(offscreenGWorld), k24RGBPixelFormat, &(movieRect), nullptr, nullptr, 0, (pixels.getPixels()), 3 * width);
+	#endif
+
 	LockPixels(GetGWorldPixMap(offscreenGWorld));
-    
+
     // from : https://github.com/openframeworks/openFrameworks/issues/244
     // SetGWorld do not seems to be necessary for offscreen rendering of the movie
     // only SetMovieGWorld should be called
     // if both are called, the app will crash after a few ofVideoPlayer object have been deleted
-    
-#ifndef TARGET_WIN32
-    SetGWorld (offscreenGWorld, NULL);
-#endif
+
+	#ifndef TARGET_WIN32
+        SetGWorld (offscreenGWorld, nullptr);
+	#endif
 	SetMovieGWorld (moviePtr, offscreenGWorld, nil);
 
 }
@@ -817,18 +696,17 @@ int ofQuickTimePlayer::getCurrentFrame() const{
 //---------------------------------------------------------------------------
 bool ofQuickTimePlayer::setPixelFormat(ofPixelFormat pixelFormat){
 	//note as we only support RGB we are just confirming that this pixel format is supported
-	if( pixelFormat == OF_PIXELS_RGB || pixelFormat == OF_PIXELS_RGBA || pixelFormat == OF_PIXELS_BGRA || pixelFormat == OF_PIXELS_YUY2){
-        internalPixelFormat = pixelFormat;
+	if( pixelFormat == OF_PIXELS_RGB ){
 		return true;
 	}
-	ofLogWarning("ofQuickTimePlayer") << "setPixelFormat(): requested pixel format " << pixelFormat << " not supported";
+	ofLogWarning("ofQuickTimePlayer") << "setPixelFormat(): requested pixel format " << pixelFormat << " not supported, expecting OF_PIXELS_RGB";
 	return false;
 }
 
 //---------------------------------------------------------------------------
 ofPixelFormat ofQuickTimePlayer::getPixelFormat() const{
 	//note if you support more than one pixel format you will need to return a ofPixelFormat variable. 
-	return internalPixelFormat;
+	return OF_PIXELS_RGB;
 }
 
 
@@ -1004,5 +882,6 @@ bool ofQuickTimePlayer::isPlaying() const{
 
 #endif
 
+#endif
 
 

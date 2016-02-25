@@ -1,6 +1,6 @@
 #include "ofQtUtils.h"
 
-#if defined (TARGET_WIN32) || (defined TARGET_OSX)
+#if (defined (TARGET_WIN32) || (defined TARGET_OSX)) && (defined(OF_VIDEO_CAPTURE_QUICKTIME) || defined(OF_VIDEO_PLAYER_QUICKTIME))
 #include "ofUtils.h"
 #include "ofGraphics.h"
 static bool bQuicktimeInitialized = false;

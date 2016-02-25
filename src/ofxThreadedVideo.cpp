@@ -31,8 +31,6 @@
 
 #include "ofxThreadedVideo.h"
 
-
-
 //--------------------------------------------------------------
 void ofxThreadedVideo::flush(){
     lock();
@@ -74,7 +72,7 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     initializeQuicktime();
     
-    setPlayer<ofQuickTimePlayer>();
+    setPlayer<ofQuickTimePlayerWithFastPixels>();
     
     // setup video instances
     video[0].setUseTexture(false);
