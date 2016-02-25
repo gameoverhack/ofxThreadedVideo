@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+		<ClCompile Include="src\ofApp.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="src\main.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\..\addons\ofxThreadedVideo\src\ofxThreadedVideo.cpp">
+			<Filter>addons\ofxThreadedVideo\src</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\..\addons\ofxThreadedVideo\libs\ofQuickTimePlayer\ofQtUtils.cpp">
+			<Filter>addons\ofxThreadedVideo\libs\ofQuickTimePlayer</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\..\addons\ofxThreadedVideo\libs\ofQuickTimePlayer\ofQuickTimePlayer.cpp">
+			<Filter>addons\ofxThreadedVideo\libs\ofQuickTimePlayer</Filter>
+		</ClCompile>
+	</ItemGroup>
+	<ItemGroup>
+		<Filter Include="src">
+			<UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons">
+			<UniqueIdentifier>{71834F65-F3A9-211E-73B8-DC85}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo">
+			<UniqueIdentifier>{1B7A5E75-103E-4AF0-D7C9-F6E9}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo\src">
+			<UniqueIdentifier>{D0EAA3B8-CF3B-9888-1083-BEDB}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo\libs">
+			<UniqueIdentifier>{43CBE699-DD52-67C5-5A68-0C21}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxThreadedVideo\libs\ofQuickTimePlayer">
+			<UniqueIdentifier>{839F7279-ACD2-405D-1BAB-C95B}</UniqueIdentifier>
+		</Filter>
+	</ItemGroup>
+	<ItemGroup>
+		<ClInclude Include="src\ofApp.h">
+			<Filter>src</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\..\addons\ofxThreadedVideo\src\ofxThreadedVideo.h">
+			<Filter>addons\ofxThreadedVideo\src</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\..\addons\ofxThreadedVideo\libs\ofQuickTimePlayer\ofQtUtils.h">
+			<Filter>addons\ofxThreadedVideo\libs\ofQuickTimePlayer</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\..\addons\ofxThreadedVideo\libs\ofQuickTimePlayer\ofQuickTimePlayer.h">
+			<Filter>addons\ofxThreadedVideo\libs\ofQuickTimePlayer</Filter>
+		</ClInclude>
+	</ItemGroup>
+	<ItemGroup>
+		<ResourceCompile Include="icon.rc" />
+	</ItemGroup>
+</Project>

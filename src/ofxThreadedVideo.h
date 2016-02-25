@@ -87,10 +87,7 @@ void createImgMemAndGWorld(){
         case OF_PIXELS_YUY2:
         {
 #if !defined (TARGET_OSX) && !defined (GL_APPLE_rgb_422)
-            movieRect.top 			= 0;
-            movieRect.left 			= 0;
-            movieRect.bottom 		= height;
-            movieRect.right 		= width*2; // this makes it look correct but we lose some of the performance gains
+            movieRect.right = width*2; // this makes it look correct but we lose some of the performance gains
             SetMovieBox(moviePtr, &(movieRect));
             //width = width / 2; // this makes it go really fast but we only get 'half-resolution'...
             offscreenGWorldPixels = new unsigned char[4 * width * height + 32];
@@ -101,10 +98,8 @@ void createImgMemAndGWorld(){
             // for some reason doesn't like non-even width's and height's
             if(width % 2 != 0) width++;
             if(height % 2 != 0) height++;
-            movieRect.top 			= 0;
-            movieRect.left 			= 0;
-            movieRect.bottom 		= height;
-            movieRect.right 		= width;
+            movieRect.bottom = height;
+            movieRect.right = width;
             
             // this works perfectly on Mac platform!
             offscreenGWorldPixels = new unsigned char[2 * width * height + 32];

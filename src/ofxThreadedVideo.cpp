@@ -186,16 +186,19 @@ void ofxThreadedVideo::update(){
                             textureInternalType = GL_RGB;
                             textureFormatType = GL_RGB;
                             texturePixelType = GL_UNSIGNED_BYTE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,3);
                             break;
                         case OF_PIXELS_RGBA:
                             textureInternalType = GL_RGBA;
                             textureFormatType = GL_RGBA;
                             texturePixelType = GL_UNSIGNED_BYTE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
                             break;
                         case OF_PIXELS_BGRA:
                             textureInternalType = GL_RGBA;
                             textureFormatType = GL_BGRA;
                             texturePixelType = GL_UNSIGNED_INT_8_8_8_8_REV;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
                             break;
 #if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
                         case OF_PIXELS_2YUV:
@@ -205,6 +208,7 @@ void ofxThreadedVideo::update(){
                             textureInternalType = GL_RGB;
                             textureFormatType = GL_RGB_422_APPLE;
                             texturePixelType = GL_UNSIGNED_SHORT_8_8_APPLE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
                             break;
                         default:
                             break;
