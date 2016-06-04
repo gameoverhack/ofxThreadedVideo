@@ -207,7 +207,23 @@ void ofxThreadedVideo::update(){
 #else
                         case OF_PIXELS_YUY2:
 #endif
-                            if(bUseInternalShader) fboYUY2.allocate(width, height);
+                            if(bUseInternalShader){
+                                fboYUY2.allocate(width, height);
+                                /*fboYUY2.begin();
+                                ofClear(0, 0, 0, 255);
+                                ofPushStyle();
+                                ofFill();
+                                ofSetColor(0,0,0);
+                                ofDrawRectangle(0, 0, width, height);
+                                ofPopStyle();
+                                fboYUY2.end();
+                                shader.begin();
+                                shader.setUniformTexture("yuvTex", fboYUY2.getTexture(), 1);
+                                shader.setUniform1i("conversionType", (false ? 709 : 601));
+                                shader.setUniform1f("fade", 0);
+                                fboYUY2.draw(-1000, -1000, width, height);
+                                shader.end();*/
+                            }
                             textureInternalType = GL_RGB;
                             textureFormatType = GL_RGB_422_APPLE;
                             texturePixelType = GL_UNSIGNED_SHORT_8_8_APPLE;
@@ -337,6 +353,15 @@ void ofxThreadedVideo::update(){
                 bPopCommand = true;
             }
             
+            if(c.getCommand() == "setPaused"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                lock();
+                bIsPaused = c.getArgument<bool>(0);
+                unlock();
+                video[videoID].setPaused(bIsPaused);
+                bPopCommand = true;
+            }
+            
             if(c.getCommand() == "setFrame"){
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                 lock();
@@ -421,15 +446,6 @@ void ofxThreadedVideo::threadedFunction(){
                     loopState = (ofLoopType)c.getArgument<int>(0);
                     unlock();
                     video[videoID].setLoopState(loopState);
-                    bPopCommand = true;
-                }
-                
-                if(c.getCommand() == "setPaused"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    lock();
-                    bIsPaused = c.getArgument<bool>(0);
-                    unlock();
-                    video[videoID].setPaused(bIsPaused);
                     bPopCommand = true;
                 }
                 
@@ -625,7 +641,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
         }
         
-        ofSleepMillis(1000.0/25.0);
+        ofSleepMillis(1000.0/30.0);
 
     }
         
@@ -960,11 +976,16 @@ ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
     ofPushStyle();
     
-    if(bUseInternalShader && fboYUY2.isAllocated()){
+    if(bUseInternalShader){
+        
+        if(!fboYUY2.isAllocated()){
+            ofPopStyle();
+            return;
+        }
         
         if(isFrameNew()){
             fboYUY2.begin();
-            ofClear(0, 0, 0, 1);
+            ofClear(0, 0, 0, 255);
             drawTexture.draw(0, 0, w, h);
             fboYUY2.end();
         }

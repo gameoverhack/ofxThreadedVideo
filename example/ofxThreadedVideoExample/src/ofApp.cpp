@@ -12,7 +12,7 @@ void ofApp::setup(){
     //video2.setVerbose(true);
     
     files.allowExt("mov");
-    files.listDir("/Users/gameover/Desktop/media"); // put a video path here with several video files in a folder
+    files.listDir("/Users/gameover/Desktop"); // put a video path here with several video files in a folder
 
     // ofxThreadedVideo is asynchronous - ie., it executes all commands
     // on a background thread. However it now implements a FIFO queue for
