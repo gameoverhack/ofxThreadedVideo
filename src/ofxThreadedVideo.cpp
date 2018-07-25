@@ -590,22 +590,22 @@ void ofxThreadedVideo::threadedFunction(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::pushCommand(ofxThreadedVideoCommand& c, bool back){
-    ofLogNotice() << instanceID << " + push " << c.getCommandAsString();
-    ofLogNotice() << instanceID << " + lock ";
+    // ofLogNotice() << instanceID << " + push " << c.getCommandAsString();
+    // ofLogNotice() << instanceID << " + lock ";
     lock();
-    ofLogNotice() << instanceID << " + ofxThreadedVideoGlobalMutex.lock(); ";
+    // ofLogNotice() << instanceID << " + ofxThreadedVideoGlobalMutex.lock(); ";
     ofxThreadedVideoGlobalMutex.lock();
     if(bVerbose) ofLogVerbose() << instanceID << " + push " << c.getCommandAsString();
     if(back){
-        ofLogNotice() << instanceID << " + back ";
+        // ofLogNotice() << instanceID << " + back ";
         ofxThreadedVideoCommands.push_back(c);
     }else{
-        ofLogNotice() << instanceID << " + not back";
+        // ofLogNotice() << instanceID << " + not back";
         ofxThreadedVideoCommands.push_front(c);
     }
     ofxThreadedVideoGlobalMutex.unlock();
     unlock();
-    ofLogNotice() << instanceID << " + unlock ";
+    // ofLogNotice() << instanceID << " + unlock ";
 }
 
 //--------------------------------------------------------------
@@ -626,7 +626,7 @@ ofxThreadedVideoCommand ofxThreadedVideo::getCommand(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::loadMovie(string path){
-    ofLogNotice() << instanceID << " - loadMovie " << path;
+    // ofLogNotice() << instanceID << " - loadMovie " << path;
     ofxThreadedVideoCommand c("loadMovie", instanceID);
     c.setArgument(path);
     pushCommand(c);
@@ -998,7 +998,7 @@ bool ofxThreadedVideo::isTextureReady(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoaded(){
-    ofLogNotice() << instanceID << " + isLoaded ";
+    // ofLogNotice() << instanceID << " + isLoaded ";
     ofScopedLock lock(mutex);
     return bLoaded;
 }
