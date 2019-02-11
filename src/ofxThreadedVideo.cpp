@@ -1,7 +1,7 @@
 /*
  * ofxThreadedVideo.cpp
  *
- * Copyright 2010-2013 (c) Matthew Gingold http://gingold.com.au
+ * Copyright 2010-2016 (c) Matthew Gingold http://gingold.com.au
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -67,35 +67,47 @@ int ofxThreadedVideo::getLoadFail(){
 //--------------------------------------------------------------
 ofxThreadedVideo::ofxThreadedVideo(){
 
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t initialize";
+
     instanceID = ofxThreadedVideoGlobalInstanceID;
     ofxThreadedVideoGlobalInstanceID++;
-    
 
-#ifdef OF_VIDEO_PLAYER_GSTREAMER
-    setPlayer<ofGstVideoPlayer>();
-#else
-    initializeQuicktime();
-    setPlayer<ofQuickTimePlayer>();
-#endif
+    
+    #ifdef OF_VIDEO_PLAYER_QUICKTIME
+        initializeQuicktime();
+        setPlayer<ofQuickTimePlayerWithFastPixels>();
+    #endif
+    #ifdef OF_VIDEO_PLAYER_DIRECTSHOW
+        setPlayer<ofDirectShowPlayer>();
+    #endif
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t setPlayer " << STRINGIFYMACRO(OF_VID_PLAYER_TYPE);
     
     // setup video instances
     video[0].setUseTexture(false);
     video[1].setUseTexture(false);
+
+    ofLog(OF_LOG_VERBOSE) << "ofVideoPlayer.getPosition " << video[0].getPosition;
     
     setPixelFormat(OF_PIXELS_RGB);
+    
+    bUseInternalShader = false;
     
     drawTexture.allocate(1, 1, GL_RGB);
     ofPixels p;
     p.allocate(1, 1, OF_IMAGE_COLOR);
     p.set(0);
     drawTexture.loadData(p.getPixels(), 1, 1, GL_RGB);
-    pixels = &video[0].getPixelsRef();
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t drawTexture.loadData";
+    // pixels = &video[0].getPixelsRef();
+    // pixels = &video[0].getPixels();
+    // ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t getPixels";
     
     // set vars to default values
     currentVideoID = VIDEO_FLIP;
     bCriticalSection = false;
     bLoaded = false;
     
+    bUseBlackStop = bForceBlack = false;
     bUseTexture = true;
     bIsFrameNew = false;
     bIsPlaying = false;
@@ -122,16 +134,19 @@ ofxThreadedVideo::ofxThreadedVideo(){
     
     fade = 1.0f;
     fades.clear();
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t fades clear";
     
     prevMillis = ofGetElapsedTimeMillis();
     lastFrameTime = timeNow = timeThen = fps = frameRate = 0;
     
     ofxThreadedVideoNullCommand.setCommand("NULL_COMMAND", -1);
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t setCommand";
     
     bVerbose = false;
     
     // let's go!
-    startThread();
+    startThread(true);
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo \t thread started";
 }
 
 //--------------------------------------------------------------
@@ -150,16 +165,20 @@ ofxThreadedVideo::~ofxThreadedVideo(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::update(){
+
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t bLoaded " << bLoaded;
     
     lock();
     
     if(!bCriticalSection && bLoaded){
+        ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t !bCriticalSection ";
         bCriticalSection = true;
         int videoID = currentVideoID;
         bool bUpdate = bLoaded;
         unlock();
         
         if(bUpdate){
+            ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t bUpdate ";
             
 //            lock();
             video[videoID].update();
@@ -171,18 +190,100 @@ void ofxThreadedVideo::update(){
 //            unlock();
             
             if(bIsFrameNew || bForceFrameNew){
-                
+                ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t bIsFrameNew ";
                 if(bForceFrameNew) lock();
                 
                 if(!bIsTextureReady) bIsTextureReady = true;
                 
                 if(drawTexture.getWidth() != width || drawTexture.getHeight() != height){
-                    drawTexture.allocate(width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+                    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t width != ";
+                    ofTextureData texData;
+                    
+                    texData.width = width;
+                    texData.height = height;
+                    texData.textureTarget = GL_TEXTURE_2D;
+  
+                    switch (internalPixelFormat) {
+                        case OF_PIXELS_RGB:
+                            textureInternalType = GL_RGB;
+                            textureFormatType = GL_RGB;
+                            texturePixelType = GL_UNSIGNED_BYTE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,3);
+                            break;
+                        case OF_PIXELS_RGBA:
+                            textureInternalType = GL_RGBA;
+                            textureFormatType = GL_RGBA;
+                            texturePixelType = GL_UNSIGNED_BYTE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
+                            break;
+                        case OF_PIXELS_BGRA:
+                            textureInternalType = GL_RGBA;
+                            textureFormatType = GL_BGRA;
+                            texturePixelType = GL_UNSIGNED_INT_8_8_8_8_REV;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
+                            break;
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+                        case OF_PIXELS_2YUV:
+#else
+                        case OF_PIXELS_YUY2:
+#endif
+                            if(bUseInternalShader){
+                                fboYUY2.allocate(width, height);
+                                /*fboYUY2.begin();
+                                ofClear(0, 0, 0, 255);
+                                ofPushStyle();
+                                ofFill();
+                                ofSetColor(0,0,0);
+                                ofDrawRectangle(0, 0, width, height);
+                                ofPopStyle();
+                                fboYUY2.end();
+                                shader.begin();
+                                shader.setUniformTexture("yuvTex", fboYUY2.getTexture(), 1);
+                                shader.setUniform1i("conversionType", (false ? 709 : 601));
+                                shader.setUniform1f("fade", 0);
+                                fboYUY2.draw(-1000, -1000, width, height);
+                                shader.end();*/
+                            }
+                            textureInternalType = GL_RGB;
+                            textureFormatType = GL_RGB_422_APPLE;
+                            texturePixelType = GL_UNSIGNED_SHORT_8_8_APPLE;
+                            ofSetPixelStoreiAlignment(GL_UNPACK_ALIGNMENT,width,1,4);
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                    
+                    
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+                    texData.glTypeInternal = textureInternalType;
+//                    texData.glType = textureFormatType;
+//                    texData.pixelType = texturePixelType;
+#else
+                    texData.glInternalFormat = textureInternalType;
+#endif
+                    drawTexture.allocate(texData, textureFormatType, texturePixelType);
+#if defined(TARGET_OSX)
+                    drawTexture.bind();
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_STORAGE_HINT_APPLE , GL_STORAGE_SHARED_APPLE);
+                    drawTexture.unbind();
+#endif
                 }
                 
-                unsigned char * pixels = video[videoID].getPixels();
-                if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, ofGetGLTypeFromPixelFormat(video[videoID].getPixelFormat()));
+				if(bForceBlack){
+					video[videoID].getPixelsRef().set(0);
+					bForceBlack = bLoaded = false;
+				}
+
+            ///// MESSING AROUND HERE   DEBUG 
+                // unsigned char * pixels = video[videoID].getPixels();
+                // if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, textureFormatType, texturePixelType);
+                ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t drawTexture.loadData ";
+                ofPixels & pixels = video[videoID].getPixels();
+                if(bUseTexture) drawTexture.loadData(pixels);
+                // if(pixels != NULL && bUseTexture) drawTexture.loadData(pixels, width, height, textureFormatType, texturePixelType);
                 
+
                 if(bForceFrameNew){
                     bForceFrameNew = false;
                     unlock();
@@ -212,6 +313,7 @@ void ofxThreadedVideo::update(){
     
     lock();
     ofxThreadedVideoGlobalMutex.lock();
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::update \t lock ";
     if(!ofxThreadedVideoGlobalCritical && !bCriticalSection){
         int videoID = currentVideoID;
         ofxThreadedVideoGlobalCritical = true;
@@ -236,13 +338,17 @@ void ofxThreadedVideo::update(){
                 bIsFrameNew = false;
                 bIsMovieDone = false;
                 bLoaded = false;
+				if(bUseBlackStop) bForceBlack = bForceFrameNew = bIsFrameNew = bLoaded = true;
                 unlock();
                 bPopCommand = true;
             }
             
             if(c.getCommand() == "loadMovie" && bCanStop){
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " execute in update";
-                if(bIsPlaying) video[videoID].stop();
+                if(bIsPlaying){
+                    video[videoID].stop();
+                    video[videoID].close();
+                }
                 lock();
                 currentVideoID = getNextLoadID();
                 bIsPaused = false;
@@ -253,12 +359,33 @@ void ofxThreadedVideo::update(){
                 unlock();
             }
             
+            if(c.getCommand() == "play"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                video[videoID].play();
+                
+                lock();
+                bIsPlaying = true;
+                bIsPaused = false;
+                unlock();
+                
+                bPopCommand = true;
+            }
+            
             if(c.getCommand() == "setSpeed"){
                 if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                 lock();
                 speed = c.getArgument<float>(0);
                 unlock();
                 video[videoID].setSpeed(speed);
+                bPopCommand = true;
+            }
+            
+            if(c.getCommand() == "setPaused"){
+                if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
+                lock();
+                bIsPaused = c.getArgument<bool>(0);
+                unlock();
+                video[videoID].setPaused(bIsPaused);
                 bPopCommand = true;
             }
             
@@ -311,18 +438,6 @@ void ofxThreadedVideo::threadedFunction(){
             
             if(c.getInstance() == instanceID){
                 
-                if(c.getCommand() == "play"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    video[videoID].play();
-                    
-                    lock();
-                    bIsPlaying = true;
-                    bIsPaused = false;
-                    unlock();
-                    
-                    bPopCommand = true;
-                }
-                
                 if(c.getCommand() == "setPosition"){
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     lock();
@@ -358,46 +473,6 @@ void ofxThreadedVideo::threadedFunction(){
                     loopState = (ofLoopType)c.getArgument<int>(0);
                     unlock();
                     video[videoID].setLoopState(loopState);
-                    bPopCommand = true;
-                }
-                
-//                if(c.getCommand() == "setSpeed"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    lock();
-//                    speed = c.getArgument<float>(0);
-//                    unlock();
-//                    video[videoID].setSpeed(speed);
-//                    bPopCommand = true;
-//                }
-                
-//                if(c.getCommand() == "setFrame"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    int frameTarget = c.getArgument<int>(0);
-//                    CLAMP(frameTarget, 0, frameTotal);
-//                    video[videoID].setFrame(frameTarget);
-//                    bForceFrameNew = true;
-//                    bPopCommand = true;
-//                }
-                
-//                if(c.getCommand() == "setFrame"){
-//                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-//                    lock();
-//                    int frameTarget = c.getArgument<int>(0);
-//                    bForceFrameNew = true;
-//                    frameTarget = CLAMP(frameTarget, 0, frameTotal);
-//                    cout << "setframe A: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
-//                    video[videoID].setFrame(frameTarget);
-//                    cout << "setframe B: " << frameTarget << " " << videoID << " " << bCriticalSection << endl;
-//                    unlock();
-//                    bPopCommand = true;
-//                }
-                
-                if(c.getCommand() == "setPaused"){
-                    if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
-                    lock();
-                    bIsPaused = c.getArgument<bool>(0);
-                    unlock();
-                    video[videoID].setPaused(bIsPaused);
                     bPopCommand = true;
                 }
                 
@@ -441,18 +516,28 @@ void ofxThreadedVideo::threadedFunction(){
                     
                     if(frameStart == frameEnd){
                         _fade = fadeTarget;
-                        if(fadeVideo) fade = _fade;
                         lock();
-                        if(fadeSound) video[videoID].setVolume(_fade);
+                        if(fadeVideo) fade = _fade;
+                        unlock();
+                        
+                        lock();
+                        if(fadeSound){
+                            volume = _fade;
+                            unlock();
+                            video[videoID].setVolume(_fade);
+                            lock();
+                        }
                         unlock();
                     }else{
                         frameEnd -= 1;
                         
-                        // assert(frameStart >= 0);
-                        // assert(frameEnd >= frameStart);
-                        // assert(frameEnd <= frameTotal);
+                        assert(frameStart >= 0);
+                        assert(frameEnd >= frameStart);
+                        assert(frameEnd <= frameTotal);
                         
+                        lock();
                         fades.push_back(ofxThreadedVideoFade(frameStart, frameEnd, fadeTarget, fadeSound, fadeVideo, fadeOnce));
+                        unlock();
                     }
                     
 
@@ -475,13 +560,14 @@ void ofxThreadedVideo::threadedFunction(){
 #endif
                 
                 if(c.getCommand() == "loadMovie" && bCanLoad){
+                    
                     if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString();
                     
                     if(video[videoID].loadMovie(c.getArgument<string>(0))){
                         
                         if(bVerbose) ofLogVerbose() << instanceID << " = " << c.getCommandAsString() << " executed in thread";;
 
-//                        lock();
+                        lock();
                         
                         fades.clear();
                         width = video[videoID].getWidth();
@@ -518,7 +604,7 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         bPopCommand = true;
                         
-                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_OK, this);
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(c.getArgument<string>(0), VIDEO_EVENT_LOAD_OK, this);
                         ofNotifyEvent(threadedVideoEvent, e, this);
                         
                         ofxThreadedVideoLoadOk++;
@@ -527,7 +613,9 @@ void ofxThreadedVideo::threadedFunction(){
                         
                         ofLogError() << "Could not load: " << instanceID << " + " << c.getCommandAsString();
                         
-                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(moviePath, VIDEO_EVENT_LOAD_FAIL, this);
+                        video[videoID].close();
+                        
+                        ofxThreadedVideoEvent e = ofxThreadedVideoEvent(c.getArgument<string>(0), VIDEO_EVENT_LOAD_FAIL, this);
                         ofNotifyEvent(threadedVideoEvent, e, this);
                         
                         ofxThreadedVideoLoadFail++;
@@ -537,14 +625,12 @@ void ofxThreadedVideo::threadedFunction(){
                 
             }
             
-            if(bPopCommand){
-                video[videoID].update();
-            }
+            if(bPopCommand) video[videoID].update();
         
             lock();
             
             if(bIsFrameNew){
-                for(unsigned int i = 0; i < fades.size(); i++){
+                for(int i = 0; i < fades.size(); i++){
                     
                     ofxThreadedVideoFade& currentFade = fades.at(i);
                     
@@ -568,7 +654,7 @@ void ofxThreadedVideo::threadedFunction(){
 
                 }
             }
-            
+
             ofxThreadedVideoGlobalMutex.lock();
             
             if(bPopCommand) popCommand();
@@ -582,7 +668,7 @@ void ofxThreadedVideo::threadedFunction(){
             unlock();
         }
         
-        ofSleepMillis(1);
+        ofSleepMillis(1000.0/30.0);
 
     }
         
@@ -590,22 +676,16 @@ void ofxThreadedVideo::threadedFunction(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::pushCommand(ofxThreadedVideoCommand& c, bool back){
-    // ofLogNotice() << instanceID << " + push " << c.getCommandAsString();
-    // ofLogNotice() << instanceID << " + lock ";
     lock();
-    // ofLogNotice() << instanceID << " + ofxThreadedVideoGlobalMutex.lock(); ";
     ofxThreadedVideoGlobalMutex.lock();
     if(bVerbose) ofLogVerbose() << instanceID << " + push " << c.getCommandAsString();
     if(back){
-        // ofLogNotice() << instanceID << " + back ";
         ofxThreadedVideoCommands.push_back(c);
     }else{
-        // ofLogNotice() << instanceID << " + not back";
         ofxThreadedVideoCommands.push_front(c);
     }
     ofxThreadedVideoGlobalMutex.unlock();
     unlock();
-    // ofLogNotice() << instanceID << " + unlock ";
 }
 
 //--------------------------------------------------------------
@@ -625,15 +705,21 @@ ofxThreadedVideoCommand ofxThreadedVideo::getCommand(){
 }
 
 //--------------------------------------------------------------
-bool ofxThreadedVideo::loadMovie(string path){
-    // ofLogNotice() << instanceID << " - loadMovie " << path;
+void ofxThreadedVideo::load(const string& path){
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::load \t" << path;
     ofxThreadedVideoCommand c("loadMovie", instanceID);
     c.setArgument(path);
     pushCommand(c);
 }
 
 //--------------------------------------------------------------
+void ofxThreadedVideo::loadMovie(const string& path){
+    load(path);
+}
+
+//--------------------------------------------------------------
 void ofxThreadedVideo::play(){
+    ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::play \t";
     ofxThreadedVideoCommand c("play", instanceID);
     pushCommand(c);
 }
@@ -642,6 +728,11 @@ void ofxThreadedVideo::play(){
 void ofxThreadedVideo::stop(){
     ofxThreadedVideoCommand c("stop", instanceID);
     pushCommand(c);
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo:: setUseBlackStop(bool b){
+	bUseBlackStop = b;
 }
 
 //--------------------------------------------------------------
@@ -727,7 +818,7 @@ void ofxThreadedVideo::clearFades(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isFrameNew(){
-    ofScopedLock lock(mutex);
+    //ofScopedLock lock(mutex);
     return bIsFrameNew;
 }
 
@@ -849,9 +940,52 @@ ofPixelsRef ofxThreadedVideo::getPixelsRef(){
 }
 
 //--------------------------------------------------------------
-void ofxThreadedVideo::setPixelFormat(ofPixelFormat _pixelFormat){
+ofShader& ofxThreadedVideo::getShader(){
+    return shader;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setUseInternalShader(bool b){
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+    if(internalPixelFormat == OF_PIXELS_2YUV){
+#else
+    if(internalPixelFormat == OF_PIXELS_YUY2){
+#endif
+        bUseInternalShader = b;
+    }else{
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+        if(b) ofLogWarning() << "You need to be using OF_PIXELS_2YUV for the internal shader to be relevant";
+#else
+        if(b) ofLogWarning() << "You need to be using OF_PIXELS_YUY2 for the internal shader to be relevant";
+#endif
+        bUseInternalShader = false;
+    }
+}
+
+//--------------------------------------------------------------
+bool ofxThreadedVideo::getUseInternalShader(){
+    return bUseInternalShader;
+}
+
+//--------------------------------------------------------------
+void ofxThreadedVideo::setPixelFormat(ofPixelFormat pixelFormat){
     ofScopedLock lock(mutex);
-    internalPixelFormat = _pixelFormat;
+#if (OF_VERSION_MAJOR == 0) && (OF_VERSION_MINOR <= 8)
+    if(pixelFormat == OF_PIXELS_2YUV){
+#else
+    if(pixelFormat == OF_PIXELS_YUY2){
+#endif
+        bool ok = shader.setupShaderFromSource(GL_VERTEX_SHADER, ofxThreadedVideoVertexShader);
+        if(ok) ok = shader.setupShaderFromSource(GL_FRAGMENT_SHADER, ofxThreadedVideoFragmentShader);
+        if(ok) ok = shader.linkProgram();
+        if(!ok){
+            ofLogError() << "Could not initialize shader - reverting to default pixel format";
+            pixelFormat = internalPixelFormat;
+        }
+        bUseInternalShader = true;
+    }
+    
+    internalPixelFormat = pixelFormat;
     video[0].setPixelFormat(internalPixelFormat);
     video[1].setPixelFormat(internalPixelFormat);
 }
@@ -869,9 +1003,35 @@ ofPtr<ofBaseVideoPlayer> ofxThreadedVideo::getPlayer(){
 
 //--------------------------------------------------------------
 void ofxThreadedVideo::draw(float x, float y, float w, float h){
+
     ofPushStyle();
-    ofSetColor(255 * fade, 255 * fade, 255 * fade, 255 * fade);
-    drawTexture.draw(x, y, w, h);
+    
+    if(bUseInternalShader){
+        if(!fboYUY2.isAllocated()){
+            ofPopStyle();
+            return;
+        }
+        
+        if(isFrameNew()){
+            fboYUY2.begin();
+            ofClear(0, 0, 0, 255);
+            drawTexture.draw(0, 0, w, h);
+            fboYUY2.end();
+        }
+
+        shader.begin();
+        shader.setUniformTexture("yuvTex", fboYUY2.getTexture(), 1);
+        shader.setUniform1i("conversionType", (false ? 709 : 601));
+        shader.setUniform1f("fade", getFade());
+        fboYUY2.draw(x, y, w, h);
+        shader.end();
+        
+    }else{
+        ofLog(OF_LOG_VERBOSE) << "ofxThreadedVideo::draw \t" << x << "\t" << y << "\t" << w << "\t" << h;
+        ofSetColor(255 * fade, 255 * fade, 255 * fade, 255 * fade);
+        drawTexture.draw(x, y, w, h);
+        
+    }
     ofPopStyle();
 }
 
@@ -978,7 +1138,7 @@ bool ofxThreadedVideo::isLoading(){
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoading(string path){
     ofScopedLock lock(ofxThreadedVideoGlobalMutex);
-    for(unsigned int i = 0; i < ofxThreadedVideoCommands.size(); i++){
+    for(int i = 0; i < ofxThreadedVideoCommands.size(); i++){
         if(ofxThreadedVideoCommands[i].getInstance() == instanceID){
             if(ofxThreadedVideoCommands[i].getCommand() == "loadMovie"){
                 if(ofxThreadedVideoCommands[i].getArgument<string>(0) == path){
@@ -998,7 +1158,6 @@ bool ofxThreadedVideo::isTextureReady(){
 
 //--------------------------------------------------------------
 bool ofxThreadedVideo::isLoaded(){
-    // ofLogNotice() << instanceID << " + isLoaded ";
     ofScopedLock lock(mutex);
     return bLoaded;
 }
@@ -1083,7 +1242,6 @@ int ofxThreadedVideo::getNextLoadID(){
         case VIDEO_FLOP:
             return VIDEO_FLIP;
             break;
-        default:
         case VIDEO_FLIP:
             return VIDEO_FLOP;
             break;
@@ -1096,7 +1254,6 @@ string ofxThreadedVideo::getEventTypeAsString(ofxThreadedVideoEventType eventTyp
         case VIDEO_EVENT_LOAD_OK:
             return "VIDEO_EVENT_LOAD_OK";
             break;
-        default:
         case VIDEO_EVENT_LOAD_FAIL:
             return "VIDEO_EVENT_LOAD_FAIL";
             break;
